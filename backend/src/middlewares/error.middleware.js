@@ -2,63 +2,60 @@ class ErrorHandler extends Error {
   constructor(message, statusCode) {
     super(message);
     this.statusCode = statusCode;
+    this.isOperational = true;
 
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
 const errorMiddleware = (err, req, res, next) => {
-  let error = err;
+  let error = Object.create(err);
 
-  // ! Clone error (important for production safety)
-  error = {
-    message: err.message,
-    statusCode: err.statusCode || 500,
-    stack: err.stack,
-    ...err,
-  };
+  error.message = err.message;
+  error.statusCode = err.statusCode || 500;
 
-  // ! Invalid MongoDB ObjectId
-  if (err.name === "CastError") {
-    error = new ErrorHandler(`Invalid ${err.path}`, 400);
+  // MongoDB Cast Error
+  if (error.name === "CastError") {
+    error = new ErrorHandler(`Invalid ${error.path}`, 400);
   }
 
-  // ! Mongoose Validation Error
-  if (err.name === "ValidationError") {
-    const message = Object.values(err.errors)
+  // Validation Error
+  if (error.name === "ValidationError") {
+    const message = Object.values(error.errors)
       .map((val) => val.message)
       .join(", ");
     error = new ErrorHandler(message, 400);
   }
 
-  // ! Duplicate Key Error
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
-    error = new ErrorHandler(`${field} already exists`, 400);
+  // Duplicate Key
+  if (error.code === 11000) {
+    const field = Object.keys(error.keyValue)[0];
+    error = new ErrorHandler(
+      `${field} already exists. Please use another ${field}`,
+      400,
+    );
   }
 
-  // ! JWT Errors
-  if (err.name === "JsonWebTokenError") {
+  // JWT Errors
+  if (error.name === "JsonWebTokenError") {
     error = new ErrorHandler("Invalid token, please login again", 401);
   }
 
-  if (err.name === "TokenExpiredError") {
+  if (error.name === "TokenExpiredError") {
     error = new ErrorHandler("Token expired, please login again", 401);
   }
 
-  // ! Production vs Development response
+  // Response
   if (process.env.NODE_ENV === "PRODUCTION") {
     return res.status(error.statusCode).json({
       success: false,
       message: error.message || "Internal Server Error",
     });
   } else {
-    // ? Development mode (detailed error)
     return res.status(error.statusCode).json({
       success: false,
       message: error.message,
       stack: error.stack,
-      error: err,
     });
   }
 };
