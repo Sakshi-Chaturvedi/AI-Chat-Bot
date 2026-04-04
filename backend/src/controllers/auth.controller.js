@@ -5,21 +5,70 @@ import {
   registerUserService,
 } from "../services/auth.service";
 import sendToken from "../utils/sendToken";
+import sendEmail from "../utils/sendVerificationMail";
 import { loginSchema, registerSchema } from "../validations/auth.validation";
+import crypto from "crypto";
 
 export const registerController = catchAsyncError(async (req, res, next) => {
   const { error } = registerSchema.validate(req.body);
 
   if (error) {
-    return next(new ErrorHandler(error.details[0].message, 400));
+    return next(
+      new ErrorHandler(error?.details?.[0]?.message || "Invalid input", 400),
+    );
   }
 
-  // sanitize input
-  const { name, email, password } = req.body;
+  const name = req.body?.name || "";
+  const email = req.body?.email || "";
+  const password = req.body?.password || "";
 
-  const user = await registerUserService({ name, email, password });
+  const sanitizedData = {
+    name: name.trim(),
+    email: email.toLowerCase().trim(),
+    password: password.trim(),
+  };
 
-  return sendToken(user, 201, res);
+  if (process.env.NODE_ENV !== "PRODUCTION") {
+    console.log("New user registering:", sanitizedData.email);
+  }
+
+  const user = await registerUserService(sanitizedData);
+
+  // ! Generate verification token
+  const rawToken = crypto.randomBytes(32).toString("hex");
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
+
+  user.verificationToken = hashedToken;
+  user.verificationExpire = Date.now() + 15 * 60 * 1000;
+
+  await user.save({ validateBeforeSave: false });
+
+  const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${rawToken}`;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "Verify your Email",
+      message: `Click to verify your email : ${verifyURL}`,
+    });
+
+    // ! Recommended: don't auto-login before email verification
+    return res.status(201).json({
+      success: true,
+      message: "User registered successfully. Please verify your email.",
+    });
+  } catch (error) {
+    user.verificationToken = undefined;
+    user.verificationExpire = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    return next(new ErrorHandler("Email could not be sent", 500));
+  }
 });
 
 export const loginController = catchAsyncError(async (req, res, next) => {

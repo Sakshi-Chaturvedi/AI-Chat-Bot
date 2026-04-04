@@ -3,6 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import router from "./routes/auth.routes.js";
+
 
 const app = express();
 
@@ -46,6 +48,9 @@ app.get("/health", (req, res) => {
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+
+// ! Auth Routes
+app.use("/api/v1/auth/",router)
 
 // ❗ 404 Handler (route not found)
 app.use((req, res, next) => {

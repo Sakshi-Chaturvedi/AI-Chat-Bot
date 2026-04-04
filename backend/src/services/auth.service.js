@@ -4,20 +4,33 @@ import { ErrorHandler } from "../middlewares/error.middleware";
 export const registerUserService = async (userData) => {
   const { name, email, password } = userData;
 
-  // optional check (UX purpose)
-  const existingUser = await userModel.findOne({ email });
-
-  if (existingUser) {
-    throw new ErrorHandler("Email is already registered", 400);
+  // ! Basic validation (extra safety)
+  if (!name || !email || !password) {
+    throw new ErrorHandler("All fields are required", 400);
   }
 
-  const user = await userModel.create({
-    name,
-    email,
-    password,
-  });
+  // ! Sanitize input
+  name = name.trim();
+  email = email.toLowerCase().trim();
+  password = password.trim();
 
-  return user;
+  try {
+    // ! Create user (MongoDB unique index will handle duplicates)
+    const user = await userModel.create({
+      name,
+      email,
+      password,
+    });
+
+    return user;
+  } catch (err) {
+    // ! Handle duplicate email error safely
+    if (err.code === 11000) {
+      throw new ErrorHandler("Email already exists", 400);
+    }
+
+    throw err; // ! other errors
+  }
 };
 
 export const loginUserService = async (userData) => {
