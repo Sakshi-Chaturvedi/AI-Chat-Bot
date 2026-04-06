@@ -1,9 +1,9 @@
-import userModel from "../models/user.model";
-import catchAsyncError from "./catchAsyncError";
-import { ErrorHandler } from "./error.middleware";
+import userModel from "../models/user.model.js";
+import catchAsyncError from "./catchAsyncError.js";
+import { ErrorHandler } from "./error.middleware.js";
 import jwt from "jsonwebtoken";
 
-export default authMiddleWare = catchAsyncError(async (req, res, next) => {
+const authMiddleWare = catchAsyncError(async (req, res, next) => {
   const token = req.cookies.accessToken;
 
   if (!token) {
@@ -22,3 +22,5 @@ export default authMiddleWare = catchAsyncError(async (req, res, next) => {
 
   next();
 });
+
+export default authMiddleWare;

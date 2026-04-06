@@ -1,18 +1,13 @@
-import userModel from "../models/user.model";
-import { ErrorHandler } from "../middlewares/error.middleware";
+import userModel from "../models/user.model.js";
+import { ErrorHandler } from "../middlewares/error.middleware.js";
 
 export const registerUserService = async (userData) => {
-  const { name, email, password } = userData;
-
   // ! Basic validation (extra safety)
-  if (!name || !email || !password) {
-    throw new ErrorHandler("All fields are required", 400);
-  }
-
-  // ! Sanitize input
-  name = name.trim();
-  email = email.toLowerCase().trim();
-  password = password.trim();
+  const { name, email, password } = {
+    name: userData.name?.trim(),
+    email: userData.email?.toLowerCase().trim(),
+    password: userData.password?.trim(),
+  };
 
   try {
     // ! Create user (MongoDB unique index will handle duplicates)
@@ -31,6 +26,32 @@ export const registerUserService = async (userData) => {
 
     throw err; // ! other errors
   }
+};
+
+export const verifyUser = async (verifyLink, user) => {
+  if (!verifyLink) {
+    throw new ErrorHandler("Invalid verification link", 400);
+  }
+
+  // 🔥 token match check
+  if (verifyLink !== user.verificationToken) {
+    throw new ErrorHandler("Invalid verification link", 400);
+  }
+
+  // 🔥 expiry check
+  if (user.verificationExpire < Date.now()) {
+    throw new ErrorHandler("Verification link expired", 400);
+  }
+
+  // 🔥 verify user
+  user.isVerified = true;
+  user.verificationToken = undefined;
+  user.verificationExpire = undefined;
+
+  // 🔥 save to DB
+  await user.save();
+
+  return user;
 };
 
 export const loginUserService = async (userData) => {
@@ -78,6 +99,23 @@ export const loginUserService = async (userData) => {
   user.lastLogin = Date.now();
 
   await user.save({ validateBeforeSave: false });
+
+  return user;
+};
+
+
+export const getUserProfileService = async (id) => {
+  if (!id) {
+    throw new ErrorHandler("User Id is required", 400);
+  }
+
+  const user = await userModel
+    .findById(id)
+    .select("-password -verificationToken -verificationExpire").lean();
+
+  if (!user) {
+    throw new ErrorHandler("User not found", 404);
+  }
 
   return user;
 };

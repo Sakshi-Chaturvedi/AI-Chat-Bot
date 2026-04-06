@@ -1,13 +1,17 @@
-import catchAsyncError from "../middlewares/catchAsyncError";
-import { ErrorHandler } from "../middlewares/error.middleware";
+import catchAsyncError from "../middlewares/catchAsyncError.js";
+import { ErrorHandler } from "../middlewares/error.middleware.js";
+import userModel from "../models/user.model.js";
 import {
+  getUserProfileService,
   loginUserService,
   registerUserService,
-} from "../services/auth.service";
-import sendToken from "../utils/sendToken";
-import sendEmail from "../utils/sendVerificationMail";
-import { loginSchema, registerSchema } from "../validations/auth.validation";
+  verifyUser,
+} from "../services/auth.service.js";
+import sendToken from "../utils/sendToken.js";
+import sendEmail from "../utils/sendVerificationMail.js";
+import { loginSchema, registerSchema } from "../validations/auth.validation.js";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 
 export const registerController = catchAsyncError(async (req, res, next) => {
   const { error } = registerSchema.validate(req.body);
@@ -55,7 +59,6 @@ export const registerController = catchAsyncError(async (req, res, next) => {
       subject: "Verify your Email",
       message: `Click to verify your email : ${verifyURL}`,
     });
-
     // ! Recommended: don't auto-login before email verification
     return res.status(201).json({
       success: true,
@@ -69,6 +72,30 @@ export const registerController = catchAsyncError(async (req, res, next) => {
 
     return next(new ErrorHandler("Email could not be sent", 500));
   }
+});
+
+export const userVerification = catchAsyncError(async (req, res, next) => {
+  const { token } = req.query;
+
+  if (!token) {
+    return next(new ErrorHandler("Token is required.", 400));
+  }
+
+  const user = await userModel.findOne({
+    verificationToken: token,
+  });
+
+  if (!user) {
+    return next(new ErrorHandler("User not Found.", 400));
+  }
+
+  verifyUser(token, user);
+
+  res.status(200).json({
+    success: true,
+    message: "User verified Successfully.",
+    user,
+  });
 });
 
 export const loginController = catchAsyncError(async (req, res, next) => {
@@ -142,4 +169,23 @@ export const logoutController = catchAsyncError(async (req, res) => {
       success: true,
       message: "Logged out successfully",
     });
+});
+
+// ! Get User Profile
+export const userProfileController = catchAsyncError(async (req, res, next) => {
+  const { token } = req.cookies;
+
+  if (!token) {
+    return next(new ErrorHandler("Login First.", 400));
+  }
+
+  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+
+  const user = await getUserProfileService(decoded);
+
+  res.status(200).json({
+    success: true,
+    message: "User Fetched Successfully",
+    user,
+  });
 });

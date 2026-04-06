@@ -1,7 +1,7 @@
 const sendToken = async (user, statusCode, res) => {
   // ! Generate tokens
-  const accessToken = user.getAccessToken();
-  const refreshToken = user.getRefreshToken();
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
 
   // ! Save refresh token in DB
   user.refreshToken = refreshToken;
