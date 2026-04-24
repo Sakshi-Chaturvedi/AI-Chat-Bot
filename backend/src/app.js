@@ -4,7 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import router from "./routes/auth.routes.js";
-
+import { errorMiddleware } from "./middlewares/error.middleware.js";
 
 const app = express();
 
@@ -50,7 +50,7 @@ app.get("/", (req, res) => {
 });
 
 // ! Auth Routes
-app.use("/api/v1/auth/",router)
+app.use("/api/v1/auth/", router);
 
 // ❗ 404 Handler (route not found)
 app.use((req, res, next) => {
@@ -69,5 +69,7 @@ app.use((err, req, res, next) => {
     message: err.message || "Internal Server Error",
   });
 });
+
+app.use(errorMiddleware);
 
 export default app;
