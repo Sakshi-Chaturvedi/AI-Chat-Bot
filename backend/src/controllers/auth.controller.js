@@ -13,6 +13,8 @@ import { loginSchema, registerSchema } from "../validations/auth.validation.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
+
+// ! User Register Token --------------->>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const registerController = catchAsyncError(async (req, res, next) => {
   const { error } = registerSchema.validate(req.body);
 
@@ -59,6 +61,7 @@ export const registerController = catchAsyncError(async (req, res, next) => {
       subject: "Verify your Email",
       message: `Click to verify your email : ${verifyURL}`,
     });
+
     // ! Recommended: don't auto-login before email verification
     return res.status(201).json({
       success: true,
@@ -74,6 +77,7 @@ export const registerController = catchAsyncError(async (req, res, next) => {
   }
 });
 
+// ! User Verification Controller ---------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const userVerification = catchAsyncError(async (req, res, next) => {
   const { token } = req.query;
 
@@ -98,6 +102,8 @@ export const userVerification = catchAsyncError(async (req, res, next) => {
   });
 });
 
+
+// ! User Login Controller ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const loginController = catchAsyncError(async (req, res, next) => {
   const { error } = loginSchema.validate(req.body);
 
@@ -124,6 +130,8 @@ export const loginController = catchAsyncError(async (req, res, next) => {
   return sendToken(user, 200, res);
 });
 
+
+// ! Refresh Token Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const refreshTokenController = catchAsyncError(
   async (req, res, next) => {
     const token = req.cookies.refreshToken;
@@ -154,6 +162,8 @@ export const refreshTokenController = catchAsyncError(
   },
 );
 
+
+// ! User Logout Controller ----------------------->>>>>>>>>>>>>>>>>>>>>>>>>>
 export const logoutController = catchAsyncError(async (req, res) => {
   const user = req.user;
 
@@ -171,7 +181,7 @@ export const logoutController = catchAsyncError(async (req, res) => {
     });
 });
 
-// ! Get User Profile
+// ! Get User Profile --------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const userProfileController = catchAsyncError(async (req, res, next) => {
   const { token } = req.cookies;
 

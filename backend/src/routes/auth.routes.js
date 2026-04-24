@@ -1,6 +1,7 @@
 import express from "express";
 import {
   loginController,
+  logoutController,
   registerController,
   userProfileController,
   userVerification,
@@ -17,5 +18,6 @@ router.post("/register", registerController);
 router.get("/verify", userVerification);
 router.get("/login", loginController);
 router.get("/profile", authMiddleware, userProfileController);
+router.get("/logout", authMiddleware, logoutController);
 
 export default router;
