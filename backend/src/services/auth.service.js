@@ -112,10 +112,15 @@ export const getUserProfileService = async (id) => {
   const user = await userModel
     .findById(id)
     .select("-password -verificationToken -verificationExpire").lean();
+  
+  console.log("Service\n",user);
+  
 
   if (!user) {
     throw new ErrorHandler("User not found", 404);
   }
 
+  console.log("Hello");
+  
   return user;
 };

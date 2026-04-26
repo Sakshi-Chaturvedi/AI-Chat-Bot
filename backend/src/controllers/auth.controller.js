@@ -1,3 +1,4 @@
+import { log } from "console";
 import catchAsyncError from "../middlewares/catchAsyncError.js";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
 import userModel from "../models/user.model.js";
@@ -105,6 +106,7 @@ export const userVerification = catchAsyncError(async (req, res, next) => {
 
 // ! User Login Controller ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const loginController = catchAsyncError(async (req, res, next) => {
+  
   const { error } = loginSchema.validate(req.body);
 
   if (error) {
@@ -112,6 +114,7 @@ export const loginController = catchAsyncError(async (req, res, next) => {
       new ErrorHandler(error?.details?.[0]?.message || "Invalid input", 400),
     );
   }
+
 
   const emailInput = req.body?.email || "";
   const passwordInput = req.body?.password || "";
@@ -183,7 +186,8 @@ export const logoutController = catchAsyncError(async (req, res) => {
 
 // ! Get User Profile --------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const userProfileController = catchAsyncError(async (req, res, next) => {
-  const { token } = req.cookies;
+  const token  = req.cookies.accessToken;
+
 
   if (!token) {
     return next(new ErrorHandler("Login First.", 400));
@@ -191,7 +195,9 @@ export const userProfileController = catchAsyncError(async (req, res, next) => {
 
   const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
 
-  const user = await getUserProfileService(decoded);
+  
+
+  const user = await getUserProfileService(decoded.id);
 
   res.status(200).json({
     success: true,
