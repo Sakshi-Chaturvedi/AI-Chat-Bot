@@ -10,6 +10,12 @@ const messageSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "aiusers",
+      required: true,
+      index: true,
+    },
     role: {
       type: String,
       enum: ["user", "assistant", "system"],
@@ -19,6 +25,10 @@ const messageSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "completed", "failed"],
     },
   },
   { timestamps: true },

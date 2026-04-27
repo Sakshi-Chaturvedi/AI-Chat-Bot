@@ -167,7 +167,7 @@ export const refreshTokenController = catchAsyncError(
 
 
 // ! User Logout Controller ----------------------->>>>>>>>>>>>>>>>>>>>>>>>>>
-export const logoutController = catchAsyncError(async (req, res) => {
+export const logoutController = catchAsyncError(async (req, res,next) => {
   const user = req.user;
 
   // ! Remove refresh token from DB

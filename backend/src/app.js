@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import router from "./routes/auth.routes.js";
+import conversationRouter from "./routes/conversation.routes.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 
 const app = express();
@@ -51,6 +52,9 @@ app.get("/", (req, res) => {
 
 // ! Auth Routes
 app.use("/api/v1/auth/", router);
+
+// ! Conversation Routes
+app.use("/api/v1/conversation", conversationRouter);
 
 // ❗ 404 Handler (route not found)
 app.use((req, res, next) => {
