@@ -1,7 +1,10 @@
 import catchAsyncError from "../middlewares/catchAsyncError.js";
+import Conversation from "../models/conversation.model.js";
 import {
   createConversationService,
+  getSingleConversationService,
   getUserConversationService,
+  updateConversationService
 } from "../services/conversation.service.js";
 
 export const createConversation = catchAsyncError(async (req, res, next) => {
@@ -48,4 +51,25 @@ export const getSingleConversationController = catchAsyncError(
       conversation,
     });
   },
+);
+
+
+export const updateConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const conversationId = req.params.id;
+    const userId = req.user.id;
+    const { title } = req.body;
+
+    const updatedConversation = await updateConversationService({
+      conversationId,
+      userId,
+      title,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Conversation updated successfully.",
+      conversation: updatedConversation,
+    });
+  }
 );

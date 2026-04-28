@@ -3,7 +3,6 @@ import { ErrorHandler } from "../middlewares/error.middleware.js";
 import Conversation from "../models/conversation.model.js";
 import User from "../models/user.model.js";
 
-
 export const createConversationService = async (userData = {}) => {
   const userId = userData.user;
   const title = userData.title?.trim() || "New Chat";
@@ -30,7 +29,6 @@ export const createConversationService = async (userData = {}) => {
   return conversation;
 };
 
-
 export const getUserConversationService = async (userId) => {
   if (!userId) {
     throw new ErrorHandler("Login first", 401);
@@ -40,12 +38,12 @@ export const getUserConversationService = async (userId) => {
     throw new ErrorHandler("Invalid user id", 400);
   }
 
-  const conversations = await Conversation.find({ user: userId })
-    .sort({ updatedAt: -1 });
+  const conversations = await Conversation.find({ user: userId }).sort({
+    updatedAt: -1,
+  });
 
   return conversations;
 };
-
 
 export const getSingleConversationService = async (id, userId) => {
   if (!id) {
@@ -66,6 +64,38 @@ export const getSingleConversationService = async (id, userId) => {
   if (conversation.user.toString() !== userId.toString()) {
     throw new ErrorHandler("Unauthorized access.", 403);
   }
+
+  return conversation;
+};
+
+export const updateConversationService = async ({
+  conversationId,
+  userId,
+  title,
+}) => {
+  if (!conversationId || !userId) {
+    throw new ErrorHandler("Conversation ID and user ID are required.", 400);
+  }
+
+  const trimmedTitle = title?.trim();
+
+  if (!trimmedTitle) {
+    throw new ErrorHandler("Title is required.", 400);
+  }
+
+  const conversation = await Conversation.findById(conversationId);
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found.", 404);
+  }
+
+  if (conversation.user.toString() !== userId.toString()) {
+    throw new ErrorHandler("Unauthorized access.", 403);
+  }
+
+  conversation.title = trimmedTitle;
+
+  await conversation.save();
 
   return conversation;
 };
