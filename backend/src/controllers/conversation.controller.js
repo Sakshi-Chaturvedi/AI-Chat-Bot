@@ -1,5 +1,8 @@
 import catchAsyncError from "../middlewares/catchAsyncError.js";
-import { createConversationService, getUserConversation, getUserConversationService } from "../services/conversation.service.js";
+import {
+  createConversationService,
+  getUserConversationService,
+} from "../services/conversation.service.js";
 
 export const createConversation = catchAsyncError(async (req, res, next) => {
   const user = req.user.id;
@@ -17,9 +20,18 @@ export const createConversation = catchAsyncError(async (req, res, next) => {
   });
 });
 
+export const getUserConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const userId = req.user.id;
 
-export const getUserConversationController = catchAsyncError(async (req, res, next) => {
-    const userId = req.user._id;
+    const conversations = await getUserConversationService(userId);
+    console.log(conversations);
+    
 
-    const userConversations = await getUserConversationService
-})
+    res.status(200).json({
+      success: true,
+      message: "Conversations fetched Successfully.",
+      conversations,
+    });
+  },
+);
