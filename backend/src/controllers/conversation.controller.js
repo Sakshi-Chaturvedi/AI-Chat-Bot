@@ -25,13 +25,27 @@ export const getUserConversationController = catchAsyncError(
     const userId = req.user.id;
 
     const conversations = await getUserConversationService(userId);
-    console.log(conversations);
-    
+    // console.log(conversations);
 
     res.status(200).json({
       success: true,
       message: "Conversations fetched Successfully.",
       conversations,
+    });
+  },
+);
+
+export const getSingleConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const id = req.params.id;
+    const userId = req.user.id;
+
+    const conversation = await getSingleConversationService(id, userId);
+
+    res.status(200).json({
+      success: true,
+      message: "Conversation fetched successfully.",
+      conversation,
     });
   },
 );

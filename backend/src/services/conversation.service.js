@@ -45,3 +45,27 @@ export const getUserConversationService = async (userId) => {
 
   return conversations;
 };
+
+
+export const getSingleConversationService = async (id, userId) => {
+  if (!id) {
+    throw new ErrorHandler("Conversation ID is required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ErrorHandler("Invalid Conversation ID.", 400);
+  }
+
+  const conversation = await Conversation.findById(id);
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found.", 404);
+  }
+
+  // 🔥 Security check
+  if (conversation.user.toString() !== userId.toString()) {
+    throw new ErrorHandler("Unauthorized access.", 403);
+  }
+
+  return conversation;
+};
