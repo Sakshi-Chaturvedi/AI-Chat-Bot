@@ -1,6 +1,6 @@
-import { required } from "joi";
+
 import mongoose, { trusted } from "mongoose";
-import userModel from "./user.model";
+import userModel from "./user.model.js";
 
 const messageSchema = new mongoose.Schema(
   {
