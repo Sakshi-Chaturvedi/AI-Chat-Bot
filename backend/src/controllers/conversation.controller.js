@@ -2,11 +2,13 @@ import catchAsyncError from "../middlewares/catchAsyncError.js";
 import Conversation from "../models/conversation.model.js";
 import {
   createConversationService,
+  deleteConversationService,
   getSingleConversationService,
   getUserConversationService,
-  updateConversationService
+  updateConversationService,
 } from "../services/conversation.service.js";
 
+// ! Create Conversation API -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>.........................
 export const createConversation = catchAsyncError(async (req, res, next) => {
   const user = req.user.id;
   const title = req.body?.title?.trim() || "New Chat";
@@ -23,6 +25,7 @@ export const createConversation = catchAsyncError(async (req, res, next) => {
   });
 });
 
+// ! Get User Conversation API ------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>..........................
 export const getUserConversationController = catchAsyncError(
   async (req, res, next) => {
     const userId = req.user.id;
@@ -38,6 +41,7 @@ export const getUserConversationController = catchAsyncError(
   },
 );
 
+// ! Get Single Conversation API ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.........................
 export const getSingleConversationController = catchAsyncError(
   async (req, res, next) => {
     const id = req.params.id;
@@ -53,7 +57,7 @@ export const getSingleConversationController = catchAsyncError(
   },
 );
 
-
+// ! Update Conversation API ------------------------>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>............................
 export const updateConversationController = catchAsyncError(
   async (req, res, next) => {
     const conversationId = req.params.id;
@@ -71,5 +75,25 @@ export const updateConversationController = catchAsyncError(
       message: "Conversation updated successfully.",
       conversation: updatedConversation,
     });
-  }
+  },
+);
+
+// ! Delete Conversation API ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>..............................
+export const deleteConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const userId = req.user.id;
+
+    const conversationId = req.params.id;
+
+    const conversations = await deleteConversationService({
+      userId,
+      conversationId,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Conversation Deleted Successfully.",
+      conversations,
+    });
+  },
 );

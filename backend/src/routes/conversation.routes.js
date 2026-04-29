@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createConversation,
+  deleteConversationController,
   getSingleConversationController,
   getUserConversationController,
   updateConversationController,
@@ -21,5 +22,6 @@ router.get(
   getSingleConversationController,
 );
 router.put("/updateTitle/:id", authMiddleWare, updateConversationController);
+router.delete("/deleteConversation/:id", authMiddleWare, deleteConversationController);
 
 export default router;

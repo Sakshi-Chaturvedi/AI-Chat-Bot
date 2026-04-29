@@ -3,6 +3,8 @@ import { ErrorHandler } from "../middlewares/error.middleware.js";
 import Conversation from "../models/conversation.model.js";
 import User from "../models/user.model.js";
 
+
+// ! Create Conversation Service -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>..............................
 export const createConversationService = async (userData = {}) => {
   const userId = userData.user;
   const title = userData.title?.trim() || "New Chat";
@@ -29,6 +31,8 @@ export const createConversationService = async (userData = {}) => {
   return conversation;
 };
 
+
+// ! Get User Conversation Service ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>.........................
 export const getUserConversationService = async (userId) => {
   if (!userId) {
     throw new ErrorHandler("Login first", 401);
@@ -45,6 +49,8 @@ export const getUserConversationService = async (userId) => {
   return conversations;
 };
 
+
+// ! Get Single Conversation Service --------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..........................
 export const getSingleConversationService = async (id, userId) => {
   if (!id) {
     throw new ErrorHandler("Conversation ID is required.", 400);
@@ -68,6 +74,8 @@ export const getSingleConversationService = async (id, userId) => {
   return conversation;
 };
 
+
+// ! Update Conversation Service ----------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>.......................
 export const updateConversationService = async ({
   conversationId,
   userId,
@@ -98,4 +106,38 @@ export const updateConversationService = async ({
   await conversation.save();
 
   return conversation;
+};
+
+
+// ! Delete Conversation Service --------------------------->>>>>>>>>>>>>>>>>>>>>>>............................
+export const deleteConversationService = async ({
+  userId,
+  conversationId,
+}) => {
+  if (!userId || !conversationId) {
+    throw new ErrorHandler("User ID and Conversation ID are required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw new ErrorHandler("Invalid Conversation ID.", 400);
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ErrorHandler("User not found.", 404);
+  }
+
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found.", 404);
+  }
+
+  // 🔥 Security check
+  if (conversation.user.toString() !== userId.toString()) {
+    throw new ErrorHandler("Unauthorized access.", 403);
+  }
+
+  await conversation.deleteOne();
+
+  return { message: "Conversation deleted successfully." };
 };
