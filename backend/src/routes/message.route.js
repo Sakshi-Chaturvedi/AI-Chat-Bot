@@ -1,8 +1,8 @@
 import express from "express";
-import { createMessageController } from "../controllers/message.controller.js";
+import { createMessageController, getMessageController } from "../controllers/message.controller.js";
 import validate from "../middlewares/validate.middleware.js";
-import { createMessageValidation } from "../validations/message.validation.js";
 import authMiddleWare from "../middlewares/auth.middleware.js";
+import { createMessageValidation } from "../validations/message.validation.js";
 
 const router = express.Router();
 
@@ -16,5 +16,7 @@ router.post(
   validate(createMessageValidation),
   createMessageController,
 );
+
+router.get("/:id", authMiddleWare, getMessageController);
 
 export default router;

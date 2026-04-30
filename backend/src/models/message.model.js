@@ -24,18 +24,23 @@ const messageSchema = new mongoose.Schema(
 
     content: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
 
     status: {
       type: String,
       enum: ["pending", "completed", "failed"],
-      default: "completed",
+      default: "pending",
     },
+
+    tokensUsed: Number,
+    model: String,
   },
   { timestamps: true }
 );
+
+messageSchema.index({ conversation: 1, createdAt: 1 });
 
 const messageModel = mongoose.model("Message", messageSchema);
 
