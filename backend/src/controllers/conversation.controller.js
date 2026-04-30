@@ -11,7 +11,7 @@ import {
 // ! Create Conversation API -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>.........................
 export const createConversation = catchAsyncError(async (req, res, next) => {
   const user = req.user.id;
-  const title = req.body?.title?.trim() || "New Chat";
+  const title = req.body?.title || "New Chat";
 
   const conversation = await createConversationService({
     user,
@@ -20,7 +20,7 @@ export const createConversation = catchAsyncError(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    message: "Conversation Created Successfully.",
+    message: "Conversation created successfully.",
     conversation,
   });
 });
@@ -31,31 +31,34 @@ export const getUserConversationController = catchAsyncError(
     const userId = req.user.id;
 
     const conversations = await getUserConversationService(userId);
-    // console.log(conversations);
 
     res.status(200).json({
       success: true,
-      message: "Conversations fetched Successfully.",
+      message: "Conversations fetched successfully.",
       conversations,
     });
-  },
+  }
 );
 
 // ! Get Single Conversation API ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.........................
 export const getSingleConversationController = catchAsyncError(
   async (req, res, next) => {
-    const id = req.params.id;
+    const conversationId = req.params.id;
     const userId = req.user.id;
 
-    const conversation = await getSingleConversationService(id, userId);
+    const conversation = await getSingleConversationService(
+      conversationId,
+      userId
+    );
 
     res.status(200).json({
       success: true,
       message: "Conversation fetched successfully.",
       conversation,
     });
-  },
+  }
 );
+
 
 // ! Update Conversation API ------------------------>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>............................
 export const updateConversationController = catchAsyncError(
