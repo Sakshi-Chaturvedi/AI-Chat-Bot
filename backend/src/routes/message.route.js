@@ -1,12 +1,20 @@
 import express from "express";
 import { createMessageController } from "../controllers/message.controller.js";
+import validate from "../middlewares/validate.middleware.js";
+import { createMessageValidation } from "../validations/message.validation.js";
+import authMiddleWare from "../middlewares/auth.middleware.js";
 
-const route = express.Router();
+const router = express.Router();
 
-route.get("/check", (req, res) => {
-  res.send("Message API working Properly.");
+router.get("/check", (req, res) => {
+  res.send("Message API working properly.");
 });
 
-route.post("/createMessage", createMessageController)
+router.post(
+  "/:id",
+  authMiddleWare,
+  validate(createMessageValidation),
+  createMessageController,
+);
 
-export default route;
+export default router;

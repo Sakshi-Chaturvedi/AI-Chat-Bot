@@ -1,6 +1,7 @@
 import catchAsyncError from "../middlewares/catchAsyncError.js";
 import messageModel from "../models/message.model.js";
-import { createConversationService } from "../services/conversation.service.js";
+import { createMessageService } from "../services/Message.service.js";
+
 
 export const createMessageController = catchAsyncError(
   async (req, res, next) => {
