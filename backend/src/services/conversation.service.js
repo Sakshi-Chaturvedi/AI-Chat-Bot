@@ -31,7 +31,7 @@ export const getUserConversationService = async (userId) => {
 
   const conversations = await Conversation.find({ user: userId })
     .select("title createdAt updatedAt")
-    .sort({ updatedAt: -1 })
+    .sort({ isPinned: -1, updatedAt: -1 })
     .lean();
 
   const conversationsWithDetails = await Promise.all(
@@ -152,9 +152,9 @@ export const deleteConversationService = async ({ userId, conversationId }) => {
 };
 
 // ! IsPinned Conversation Service ---------------------->>>>>>>>>>>>>>>>>>>............................
-export const isPinnedConversationService = async (conversationData = {}) => {
-  const cid = conversationData.cid;
-  const uid = conversationData.uid;
+export const togglePinConversationService = async (conversationData = {}) => {
+  const cid = conversationData.conversationId;
+  const uid = conversationData.userId;
 
   if (!uid) {
     throw new ErrorHandler("Unauthorized.", 401);
@@ -178,6 +178,39 @@ export const isPinnedConversationService = async (conversationData = {}) => {
   }
 
   conversation.isPinned = !conversation.isPinned;
+
+  await conversation.save();
+
+  return conversation;
+};
+
+// ! Archieve Chats Conversation Service ---------------------->>>>>>>>>>>>>.........................
+export const archiveConversationService = async (conversationData = {}) => {
+  const cid = conversationData.cid;
+  const uid = conversationData.uid;
+
+  if (!uid) {
+    throw new ErrorHandler("Unauthorized.", 401);
+  }
+
+  if (!cid) {
+    throw new ErrorHandler("Conversation id is required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(cid)) {
+    throw new ErrorHandler("Invalid Conversation id.", 400);
+  }
+
+  const conversation = await Conversation.findOne({
+    _id: cid,
+    user: uid,
+  });
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found.", 404);
+  }
+
+  conversation.isArchived = !conversation.isArchived;
 
   await conversation.save();
 

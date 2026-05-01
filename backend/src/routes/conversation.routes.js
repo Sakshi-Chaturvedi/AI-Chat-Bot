@@ -1,9 +1,11 @@
 import express from "express";
 import {
+  archiveConversationController,
   createConversation,
   deleteConversationController,
   getSingleConversationController,
   getUserConversationController,
+  togglePinConversationController,
   updateConversationController,
 } from "../controllers/conversation.controller.js";
 
@@ -25,32 +27,32 @@ router.post(
   "/",
   authMiddleWare,
   validate(createConversationValidation),
-  createConversation
+  createConversation,
 );
 
-router.get(
-  "/conversations",
-  authMiddleWare,
-  getUserConversationController
-);
+router.get("/conversations", authMiddleWare, getUserConversationController);
 
 router.get(
   "/conversation/:id",
   authMiddleWare,
-  getSingleConversationController
+  getSingleConversationController,
 );
 
 router.put(
   "/updateTitle/:id",
   authMiddleWare,
   validate(updateConversationValidation),
-  updateConversationController
+  updateConversationController,
 );
 
 router.delete(
   "/deleteConversation/:id",
   authMiddleWare,
-  deleteConversationController
+  deleteConversationController,
 );
+
+router.patch("/pinnedconversation/:id", authMiddleWare, togglePinConversationController);
+
+router.patch("/archieveconversation/:id", authMiddleWare, archiveConversationController);
 
 export default router;

@@ -1,11 +1,12 @@
 import catchAsyncError from "../middlewares/catchAsyncError.js";
 import Conversation from "../models/conversation.model.js";
 import {
+  archiveConversationService,
   createConversationService,
   deleteConversationService,
   getSingleConversationService,
   getUserConversationService,
-  isPinnedConversationService,
+  togglePinConversationService,
   updateConversationService,
 } from "../services/conversation.service.js";
 
@@ -38,7 +39,7 @@ export const getUserConversationController = catchAsyncError(
       message: "Conversations fetched successfully.",
       conversations,
     });
-  }
+  },
 );
 
 // ! Get Single Conversation API ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.........................
@@ -49,7 +50,7 @@ export const getSingleConversationController = catchAsyncError(
 
     const conversation = await getSingleConversationService(
       conversationId,
-      userId
+      userId,
     );
 
     res.status(200).json({
@@ -57,9 +58,8 @@ export const getSingleConversationController = catchAsyncError(
       message: "Conversation fetched successfully.",
       conversation,
     });
-  }
+  },
 );
-
 
 // ! Update Conversation API ------------------------>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>............................
 export const updateConversationController = catchAsyncError(
@@ -102,9 +102,7 @@ export const deleteConversationController = catchAsyncError(
   },
 );
 
-
-// ! Is Conversation Pinned API ------------->>>>>>>>>>>>>>>>>>>>........................
-// ! Toggle Pin Conversation Controller
+// ! Toggle Pin Conversation Controller ------------->>>>>>>>>>>>>>>>>>>>........................
 export const togglePinConversationController = catchAsyncError(
   async (req, res, next) => {
     const conversationId = req.params.id;
@@ -121,6 +119,27 @@ export const togglePinConversationController = catchAsyncError(
         ? "Conversation pinned successfully."
         : "Conversation unpinned successfully.",
       conversation,
+    });
+  },
+);
+
+// ! Archieve Conversation Controller -------------------->>>>>>>>>>>>>>>>>>>>>>......................
+export const archiveConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const cid = req.params.id;
+    const uid = req.user?._id || req.user?.id;
+
+    const archivedConversation = await archiveConversationService({
+      cid,
+      uid,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: archivedConversation.isArchived
+        ? "Conversation archived successfully."
+        : "Conversation unarchived successfully.",
+      conversation: archivedConversation,
     });
   },
 );
