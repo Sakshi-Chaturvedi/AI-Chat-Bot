@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
 import Conversation from "../models/conversation.model.js";
 import User from "../models/user.model.js";
+import messageModel from "../models/message.model.js";
 
 // ! Create Conversation Service -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>..............................
 export const createConversationService = async (userData = {}) => {
@@ -33,7 +34,31 @@ export const getUserConversationService = async (userId) => {
     .sort({ updatedAt: -1 })
     .lean();
 
-  return conversations;
+  const conversationsWithDetails = await Promise.all(
+    conversations.map(async (conversation) => {
+      const lastMessage = await messageModel.findOne({
+        conversation: conversation._id,
+        user: userId,
+      })
+        .select("content role createdAt")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      const messageCount = await messageModel.countDocuments({
+        conversation: conversation._id,
+        user: userId,
+      });
+
+      return {
+        ...conversation,
+        lastMessage: lastMessage?.content || null,
+        lastMessageRole: lastMessage?.role || null,
+        messageCount,
+      };
+    })
+  );
+
+  return conversationsWithDetails;
 };
 
 // ! Get Single Conversation Service --------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..........................
@@ -50,14 +75,13 @@ export const getSingleConversationService = async (id, userId) => {
     throw new ErrorHandler("Invalid Conversation ID.", 400);
   }
 
-  const conversation = await Conversation.findById(id);
+  const conversation = await Conversation.findOne({
+    _id: id,
+    user: userId,
+  }).lean();
 
   if (!conversation) {
-    throw new ErrorHandler("Conversation not found.", 404);
-  }
-
-  if (conversation.user.toString() !== userId.toString()) {
-    throw new ErrorHandler("Unauthorized access.", 403);
+    throw new ErrorHandler("Conversation not found or unauthorized.", 404);
   }
 
   return conversation;

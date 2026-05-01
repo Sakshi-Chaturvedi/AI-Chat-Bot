@@ -1,5 +1,10 @@
 import express from "express";
-import { createMessageController, getMessageController } from "../controllers/message.controller.js";
+import {
+  createMessageController,
+  editMessageController,
+  getMessageController,
+  regenerateMessageController,
+} from "../controllers/message.controller.js";
 import validate from "../middlewares/validate.middleware.js";
 import authMiddleWare from "../middlewares/auth.middleware.js";
 import { createMessageValidation } from "../validations/message.validation.js";
@@ -18,5 +23,9 @@ router.post(
 );
 
 router.get("/:id", authMiddleWare, getMessageController);
+
+router.patch("/:id", authMiddleWare, editMessageController);
+
+router.patch("/regenrateReply/:id", authMiddleWare, regenerateMessageController);
 
 export default router;

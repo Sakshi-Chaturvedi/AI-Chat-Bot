@@ -1,7 +1,12 @@
 import catchAsyncError from "../middlewares/catchAsyncError.js";
-import messageModel from "../models/message.model.js";
-import { createMessageService, getAllMessagesService } from "../services/Message.service.js";
 
+import messageModel from "../models/message.model.js";
+import {
+  createMessageService,
+  editMessageService,
+  getAllMessagesService,
+  regenerateReplyService,
+} from "../services/Message.service.js";
 
 // ! Create Message API ------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>.......................
 export const createMessageController = catchAsyncError(
@@ -21,9 +26,8 @@ export const createMessageController = catchAsyncError(
       message: "Message created successfully.",
       data: message,
     });
-  }
+  },
 );
-
 
 // ! Get All Messages Controller ------------------------->>>>>>>>>>>>>>>>>>>>>>>>..........................
 export const getMessageController = catchAsyncError(async (req, res, next) => {
@@ -39,3 +43,38 @@ export const getMessageController = catchAsyncError(async (req, res, next) => {
   });
 });
 
+// ! Edit Message Controller ------------------------>>>>>>>>>>>>>>>>>>>>>...............................
+export const editMessageController = catchAsyncError(async (req, res, next) => {
+  const messageId = req.params.id;
+  const userId = req.user.id;
+
+  const { content } = req.body;
+
+  const updatedMessage = await editMessageService({
+    messageId,
+    userId,
+    content,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Message updated successfully.",
+    updatedMessage,
+  });
+});
+
+// ! Regenrate Assistant message of the particular questions ------------>>>>>>>>>>>>>>>>......................
+export const regenerateMessageController = catchAsyncError(
+  async (req, res, next) => {
+    const mid = req.params.id;
+    const uid = req.user.id;
+
+    const newAnswer = await regenerateReplyService({ mid, uid });
+
+    res.status(200).json({
+      success: true,
+      message: "Regenerated Reply Successfully.",
+      newAnswer,
+    });
+  },
+);
