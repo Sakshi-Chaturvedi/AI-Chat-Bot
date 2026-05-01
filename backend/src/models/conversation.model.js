@@ -4,7 +4,7 @@ const conversationSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "aiusers", 
+      ref: "aiusers",
       required: true,
       index: true,
     },
@@ -14,6 +14,11 @@ const conversationSchema = new mongoose.Schema(
       default: "New Chat",
       trim: true,
       maxlength: 100,
+    },
+
+    isPinned: {
+      type: Boolean,
+      default: false,
     },
 
     isArchived: {
@@ -28,7 +33,7 @@ const conversationSchema = new mongoose.Schema(
   },
   {
     timestamps: true, // createdAt + updatedAt automatically
-  }
+  },
 );
 
 conversationSchema.index({ user: 1, updatedAt: -1 });

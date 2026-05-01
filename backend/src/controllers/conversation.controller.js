@@ -5,6 +5,7 @@ import {
   deleteConversationService,
   getSingleConversationService,
   getUserConversationService,
+  isPinnedConversationService,
   updateConversationService,
 } from "../services/conversation.service.js";
 
@@ -97,6 +98,29 @@ export const deleteConversationController = catchAsyncError(
       success: true,
       message: "Conversation Deleted Successfully.",
       conversations,
+    });
+  },
+);
+
+
+// ! Is Conversation Pinned API ------------->>>>>>>>>>>>>>>>>>>>........................
+// ! Toggle Pin Conversation Controller
+export const togglePinConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const conversationId = req.params.id;
+    const userId = req.user.id;
+
+    const conversation = await togglePinConversationService({
+      conversationId,
+      userId,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: conversation.isPinned
+        ? "Conversation pinned successfully."
+        : "Conversation unpinned successfully.",
+      conversation,
     });
   },
 );

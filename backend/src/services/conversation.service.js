@@ -36,10 +36,11 @@ export const getUserConversationService = async (userId) => {
 
   const conversationsWithDetails = await Promise.all(
     conversations.map(async (conversation) => {
-      const lastMessage = await messageModel.findOne({
-        conversation: conversation._id,
-        user: userId,
-      })
+      const lastMessage = await messageModel
+        .findOne({
+          conversation: conversation._id,
+          user: userId,
+        })
         .select("content role createdAt")
         .sort({ createdAt: -1 })
         .lean();
@@ -55,7 +56,7 @@ export const getUserConversationService = async (userId) => {
         lastMessageRole: lastMessage?.role || null,
         messageCount,
       };
-    })
+    }),
   );
 
   return conversationsWithDetails;
@@ -144,8 +145,41 @@ export const deleteConversationService = async ({ userId, conversationId }) => {
     throw new ErrorHandler("Unauthorized access.", 403);
   }
 
-  await Message.deleteMany({ conversation: conversationId });
+  await messageModel.deleteMany({ conversation: conversationId });
   await conversation.deleteOne();
 
   return { message: "Conversation deleted successfully." };
+};
+
+// ! IsPinned Conversation Service ---------------------->>>>>>>>>>>>>>>>>>>............................
+export const isPinnedConversationService = async (conversationData = {}) => {
+  const cid = conversationData.cid;
+  const uid = conversationData.uid;
+
+  if (!uid) {
+    throw new ErrorHandler("Unauthorized.", 401);
+  }
+
+  if (!cid) {
+    throw new ErrorHandler("Conversation id is required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(cid)) {
+    throw new ErrorHandler("Invalid Conversation ID.", 400);
+  }
+
+  const conversation = await Conversation.findOne({
+    _id: cid,
+    user: uid,
+  });
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found.", 404);
+  }
+
+  conversation.isPinned = !conversation.isPinned;
+
+  await conversation.save();
+
+  return conversation;
 };
