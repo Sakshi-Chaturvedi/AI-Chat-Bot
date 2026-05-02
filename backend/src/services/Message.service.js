@@ -254,3 +254,39 @@ export const regenerateReplyService = async (messageData = {}) => {
 
   return assistantMessage;
 };
+
+// ! Search Message Service -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>......................
+export const searchMessageService = async (searchData = {}) => {
+  const uid = searchData.uid;
+  const cid = searchData.cid;
+
+  const query = searchData.query;
+
+  if (!uid) throw new ErrorHandler("Unauthorized Access!", 401);
+
+  if (!cid) throw new ErrorHandler("Conversation id is required.", 400);
+
+  if (!mongoose.Types.ObjectId.isValid(cid))
+    throw new ErrorHandler("Invalid Conversation id.", 400);
+
+  if (!query) throw new ErrorHandler("Query is required for the search.", 400);
+
+  const conversation = await Conversation.findById({
+    _id: cid,
+    user: uid,
+  });
+
+  if (!conversation) throw new ErrorHandler("Conversation not Found.", 400);
+
+  const messages = await messageModel
+    .find({
+      conversation: cid,
+      content: {
+        $regex: query,
+        $options: "i",
+      },
+    })
+    .sort({ createdAt: 1 });
+
+  return messages;
+};

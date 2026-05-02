@@ -4,6 +4,7 @@ import {
   editMessageController,
   getMessageController,
   regenerateMessageController,
+  searchMessagecontroller,
 } from "../controllers/message.controller.js";
 import validate from "../middlewares/validate.middleware.js";
 import authMiddleWare from "../middlewares/auth.middleware.js";
@@ -22,10 +23,16 @@ router.post(
   createMessageController,
 );
 
+router.get("/searchMessage/:id", authMiddleWare, searchMessagecontroller);
+
 router.get("/:id", authMiddleWare, getMessageController);
 
 router.patch("/:id", authMiddleWare, editMessageController);
 
-router.patch("/regenrateReply/:id", authMiddleWare, regenerateMessageController);
+router.patch(
+  "/regenrateReply/:id",
+  authMiddleWare,
+  regenerateMessageController,
+);
 
 export default router;

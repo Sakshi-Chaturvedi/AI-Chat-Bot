@@ -6,6 +6,7 @@ import {
   editMessageService,
   getAllMessagesService,
   regenerateReplyService,
+  searchMessageService,
 } from "../services/Message.service.js";
 
 // ! Create Message API ------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>.......................
@@ -63,7 +64,7 @@ export const editMessageController = catchAsyncError(async (req, res, next) => {
   });
 });
 
-// ! Regenrate Assistant message of the particular questions ------------>>>>>>>>>>>>>>>>......................
+// ! Regenerate Assistant message of the particular questions ------------>>>>>>>>>>>>>>>>......................
 export const regenerateMessageController = catchAsyncError(
   async (req, res, next) => {
     const mid = req.params.id;
@@ -78,3 +79,21 @@ export const regenerateMessageController = catchAsyncError(
     });
   },
 );
+
+
+// ! Search Message Controller ---------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>.........................
+export const searchMessagecontroller = catchAsyncError(async(req, res, next) => {
+  const uid = req.user.id || req.user._id;
+  const cid = req.params.id;
+
+  const query = req.query.q;
+
+  const resultant = await searchMessageService({ uid, cid, query });
+
+  res.status(200).json({
+    success: true,
+    message: "Message Fetched Successfully.",
+    count: resultant.length,
+    resultant
+  })
+})
