@@ -7,6 +7,7 @@ import router from "./routes/auth.routes.js";
 import conversationRouter from "./routes/conversation.routes.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import messageRouter from "./routes/message.route.js";
+import apiLimiter from "./middlewares/rateLimit.middleware.js"
 
 const app = express();
 
@@ -21,6 +22,9 @@ app.use(express.json({ limit: "10kb" }));
 
 // ! Cookie-Parser
 app.use(cookieParser());
+
+// ! Rate Limiter Middleware
+app.use("/api", apiLimiter);
 
 // ! CORS configuration
 const allowedOrigins = [process.env.FRONTEND_URL];

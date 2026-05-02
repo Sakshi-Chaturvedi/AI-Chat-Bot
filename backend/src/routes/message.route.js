@@ -9,6 +9,7 @@ import {
 import validate from "../middlewares/validate.middleware.js";
 import authMiddleWare from "../middlewares/auth.middleware.js";
 import { createMessageValidation } from "../validations/message.validation.js";
+import { messageLimiter } from "../middlewares/messageLimiter.middleware.js";
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ router.get("/check", (req, res) => {
 router.post(
   "/:id",
   authMiddleWare,
+  messageLimiter,
   validate(createMessageValidation),
   createMessageController,
 );
