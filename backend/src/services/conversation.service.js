@@ -216,3 +216,33 @@ export const archiveConversationService = async (conversationData = {}) => {
 
   return conversation;
 };
+
+// ! Search Conversation Service --------------------->>>>>>>>>>>>>>>>>>>>>....................
+// ! Search Conversations By Title Service
+export const searchConversationService = async (searchData = {}) => {
+  const uid = searchData.uid;
+  const searchQuery = searchData.searchQuery?.trim();
+
+  if (!uid) {
+    throw new ErrorHandler("Unauthorized Access!", 401);
+  }
+
+  if (!searchQuery) {
+    throw new ErrorHandler("Search query is required.", 400);
+  }
+
+  const conversations = await Conversation.find({
+    user: uid,
+    isArchived: false,
+    title: {
+      $regex: searchQuery,
+      $options: "i",
+    },
+  }).sort({
+    isPinned: -1,
+    lastMessageAt: -1,
+    updatedAt: -1,
+  });
+
+  return conversations;
+};

@@ -6,6 +6,7 @@ import {
   deleteConversationService,
   getSingleConversationService,
   getUserConversationService,
+  searchConversationService,
   togglePinConversationService,
   updateConversationService,
 } from "../services/conversation.service.js";
@@ -140,6 +141,27 @@ export const archiveConversationController = catchAsyncError(
         ? "Conversation archived successfully."
         : "Conversation unarchived successfully.",
       conversation: archivedConversation,
+    });
+  },
+);
+
+// ! Search Conversation Controller -------------------->>>>>>>>>>>>>>>>>>>>>>>>........................
+// ! Search Conversations Controller
+export const searchConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.user?._id || req.user?.id;
+    const searchQuery = req.query.q;
+
+    const conversations = await searchConversationService({
+      uid,
+      searchQuery,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Conversations fetched successfully.",
+      count: conversations.length,
+      conversations,
     });
   },
 );

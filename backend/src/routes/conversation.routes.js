@@ -5,6 +5,7 @@ import {
   deleteConversationController,
   getSingleConversationController,
   getUserConversationController,
+  searchConversationController,
   togglePinConversationController,
   updateConversationController,
 } from "../controllers/conversation.controller.js";
@@ -32,6 +33,8 @@ router.post(
 
 router.get("/conversations", authMiddleWare, getUserConversationController);
 
+router.get("/searchConversation", authMiddleWare, searchConversationController);
+
 router.get(
   "/conversation/:id",
   authMiddleWare,
@@ -51,8 +54,18 @@ router.delete(
   deleteConversationController,
 );
 
-router.patch("/pinnedconversation/:id", authMiddleWare, togglePinConversationController);
+router.patch(
+  "/pinnedconversation/:id",
+  authMiddleWare,
+  togglePinConversationController,
+);
 
-router.patch("/archieveconversation/:id", authMiddleWare, archiveConversationController);
+router.patch(
+  "/archieveconversation/:id",
+  authMiddleWare,
+  archiveConversationController,
+);
+
+
 
 export default router;
