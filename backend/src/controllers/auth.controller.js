@@ -3,9 +3,11 @@ import catchAsyncError from "../middlewares/catchAsyncError.js";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
 import userModel from "../models/user.model.js";
 import {
+  forgotPasswordService,
   getUserProfileService,
   loginUserService,
   registerUserService,
+  resetPasswordService,
   verifyUser,
 } from "../services/auth.service.js";
 import sendToken from "../utils/sendToken.js";
@@ -14,17 +16,8 @@ import { loginSchema, registerSchema } from "../validations/auth.validation.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
-
 // ! User Register Token --------------->>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const registerController = catchAsyncError(async (req, res, next) => {
-  const { error } = registerSchema.validate(req.body);
-
-  if (error) {
-    return next(
-      new ErrorHandler(error?.details?.[0]?.message || "Invalid input", 400),
-    );
-  }
-
   const name = req.body?.name || "";
   const email = req.body?.email || "";
   const password = req.body?.password || "";
@@ -103,19 +96,8 @@ export const userVerification = catchAsyncError(async (req, res, next) => {
   });
 });
 
-
 // ! User Login Controller ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const loginController = catchAsyncError(async (req, res, next) => {
-  
-  const { error } = loginSchema.validate(req.body);
-
-  if (error) {
-    return next(
-      new ErrorHandler(error?.details?.[0]?.message || "Invalid input", 400),
-    );
-  }
-
-
   const emailInput = req.body?.email || "";
   const passwordInput = req.body?.password || "";
 
@@ -132,7 +114,6 @@ export const loginController = catchAsyncError(async (req, res, next) => {
 
   return sendToken(user, 200, res);
 });
-
 
 // ! Refresh Token Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const refreshTokenController = catchAsyncError(
@@ -165,9 +146,8 @@ export const refreshTokenController = catchAsyncError(
   },
 );
 
-
 // ! User Logout Controller ----------------------->>>>>>>>>>>>>>>>>>>>>>>>>>
-export const logoutController = catchAsyncError(async (req, res,next) => {
+export const logoutController = catchAsyncError(async (req, res, next) => {
   const user = req.user;
 
   // ! Remove refresh token from DB
@@ -186,16 +166,13 @@ export const logoutController = catchAsyncError(async (req, res,next) => {
 
 // ! Get User Profile --------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 export const userProfileController = catchAsyncError(async (req, res, next) => {
-  const token  = req.cookies.accessToken;
-
+  const token = req.cookies.accessToken;
 
   if (!token) {
     return next(new ErrorHandler("Login First.", 400));
   }
 
   const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-
-  
 
   const user = await getUserProfileService(decoded.id);
 
@@ -205,3 +182,61 @@ export const userProfileController = catchAsyncError(async (req, res, next) => {
     user,
   });
 });
+
+// ! Forgot Password Contoller -------------------------->>>>>>>>>>>>>>>>>>>>>>>>>
+export const forgotPasswordController = catchAsyncError(
+  async (req, res, next) => {
+    const email = req.body.email?.toLowerCase().trim();
+
+    const resetToken = await forgotPasswordService({ email });
+
+    const resetPasswordURL = `${
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    }/reset-password/${resetToken}`;
+
+    try {
+      await sendEmail({
+        email,
+        subject: "Reset your password",
+        message: `Click here to reset your password: ${resetPasswordURL}`,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: `Password reset email sent to: ${email}`,
+      });
+    } catch (error) {
+      const user = await userModel.findOne({ email });
+
+      if (user) {
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+        await user.save({ validateBeforeSave: false });
+      }
+
+      return next(
+        new ErrorHandler("Reset password email could not be sent.", 500),
+      );
+    }
+  },
+);
+
+// ! Reset Password Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const resetPassWordController = catchAsyncError(
+  async (req, res, next) => {
+    const { token } = req.params;
+    const { password, confirmPassword } = req.body;
+
+    const resetPassword = await resetPasswordService({
+      token,
+      password,
+      confirmPassword,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Password has been reset",
+      resetPassword,
+    });
+  },
+);

@@ -1,5 +1,6 @@
 import userModel from "../models/user.model.js";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
+import crypto from "crypto";
 
 export const registerUserService = async (userData) => {
   // ! Basic validation (extra safety)
@@ -103,7 +104,6 @@ export const loginUserService = async (userData) => {
   return user;
 };
 
-
 export const getUserProfileService = async (id) => {
   if (!id) {
     throw new ErrorHandler("User Id is required", 400);
@@ -111,16 +111,80 @@ export const getUserProfileService = async (id) => {
 
   const user = await userModel
     .findById(id)
-    .select("-password -verificationToken -verificationExpire").lean();
-  
-  console.log("Service\n",user);
-  
+    .select("-password -verificationToken -verificationExpire")
+    .lean();
+
+  console.log("Service\n", user);
 
   if (!user) {
     throw new ErrorHandler("User not found", 404);
   }
 
   console.log("Hello");
-  
+
+  return user;
+};
+
+export const forgotPasswordService = async (userData = {}) => {
+  const email = userData?.email?.toLowerCase().trim();
+
+  if (!email) {
+    throw new ErrorHandler("Email is required.", 400);
+  }
+
+  const user = await userModel.findOne({ email });
+
+  if (!user) {
+    throw new ErrorHandler("User not found.", 404);
+  }
+
+  const resetToken = user.generateResetPasswordToken();
+
+  await user.save({ validateBeforeSave: false });
+
+  return resetToken;
+};
+
+export const resetPasswordService = async (userData = {}) => {
+  const token = userData.token;
+  const password = userData.password;
+  const confirmPassword = userData.confirmPassword;
+
+  if (!token) {
+    throw new ErrorHandler("Token not found.", 400);
+  }
+
+  if (!password) {
+    throw new ErrorHandler("New password is required.", 400);
+  }
+
+  const resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const user = await userModel
+    .findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    })
+    .select("+password");
+
+  if (!user) {
+    throw new ErrorHandler(
+      "Reset password token is invalid or has expired.",
+      400,
+    );
+  }
+
+  if (password != confirmPassword)
+    throw new ErrorHandler("Confirm Password Should be Equal to Password.");
+
+  user.password = password;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+
+  await user.save();
+
   return user;
 };

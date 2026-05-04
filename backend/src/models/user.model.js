@@ -120,6 +120,4 @@ userSchema.methods.generateRefreshToken = function () {
 };
 
 
-
-
 export default mongoose.model("aiuser", userSchema);
