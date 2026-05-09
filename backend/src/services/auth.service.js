@@ -1,6 +1,7 @@
 import userModel from "../models/user.model.js";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
 import crypto from "crypto";
+import { uploadBufferToCloudinary } from "../utils/uploadToCloudinary.js";
 
 export const registerUserService = async (userData) => {
   // ! Basic validation (extra safety)
@@ -263,4 +264,37 @@ export const changePasswordService = async ({
   return true;
 };
 
+// ! Update Profile Service ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const updateProfilePicService = async ({ uid, name, file }) => {
+  if (!uid) throw new ErrorHandler("User id is required.", 400);
 
+  const user = await userModel.findById(uid);
+
+  if (!user) throw new ErrorHandler("User not Found.", 404);
+
+  if (name?.trim()) {
+    user.name = name.trim();
+  }
+
+  if (file) {
+    if (user.avatar?.public_id) {
+      await cloudinary.uploader.destroy(user.avatar.public_id);
+    }
+
+    const uploadedImage = await uploadBufferToCloudinary(
+      file.buffer,
+      `chatbot-ai/users/${user._id}/avatar`,
+    );
+
+    user.avatar = {
+      public_id: uploadedImage.public_id,
+      url: uploadedImage.secure_url,
+    };
+  }
+
+  await user.save({ validateBeforeSave: false });
+
+  user.password = undefined;
+
+  return user;
+};

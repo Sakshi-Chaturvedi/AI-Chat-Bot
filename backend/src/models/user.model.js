@@ -37,10 +37,15 @@ const userSchema = new mongoose.Schema(
     },
 
     avatar: {
-      public_id: String,
-      url: String,
+      public_id: {
+        type: String,
+        default: null,
+      },
+      url: {
+        type: String,
+        default: null,
+      },
     },
-
     // ? Auth
     refreshToken: String,
 
@@ -118,6 +123,5 @@ userSchema.methods.generateRefreshToken = function () {
     expiresIn: "7d",
   });
 };
-
 
 export default mongoose.model("aiuser", userSchema);

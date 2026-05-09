@@ -10,6 +10,7 @@ import {
   registerUserService,
   resendVerificationService,
   resetPasswordService,
+  updateProfilePicService,
   verifyUser,
 } from "../services/auth.service.js";
 import sendToken from "../utils/sendToken.js";
@@ -292,7 +293,6 @@ export const resendEmailVerification = catchAsyncError(
   },
 );
 
-
 // ! Change Password Controller ----------------->>>>>>>>>>>>>>>>>>>>>>
 export const changePasswordController = catchAsyncError(
   async (req, res, next) => {
@@ -310,6 +310,22 @@ export const changePasswordController = catchAsyncError(
     res.status(200).json({
       success: true,
       message: "Password has been changed successfully.",
+    });
+  },
+);
+
+// ! update User Profile Pic -------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>
+export const updateProfilePicController = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.user?.id || req.user?._id;
+    const { name } = req.body;
+
+    const user = await updateProfilePicService({ uid, name, file: req.file });
+
+    res.status(200).json({
+      success: true,
+      message: "Profile Updated Successully.",
+      user,
     });
   },
 );

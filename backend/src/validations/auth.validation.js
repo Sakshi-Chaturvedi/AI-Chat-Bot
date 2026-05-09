@@ -81,3 +81,11 @@ export const changePasswordSchema = Joi.object({
       "any.required": "Confirm password is required",
     }),
 });
+
+export const updateProfileSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(50).optional().messages({
+    "string.empty": "Name cannot be empty.",
+    "string.min": "Name must be at least 2 characters.",
+    "string.max": "Name cannot be more than 50 characters.",
+  }),
+});

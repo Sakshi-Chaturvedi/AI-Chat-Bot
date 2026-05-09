@@ -7,6 +7,7 @@ import {
   registerController,
   resendEmailVerification,
   resetPassWordController,
+  updateProfilePicController,
   userProfileController,
   userVerification,
 } from "../controllers/auth.controller.js";
@@ -20,7 +21,9 @@ import {
   registerSchema,
   resendVerificationSchema,
   resetPasswordSchema,
+  updateProfileSchema,
 } from "../validations/auth.validation.js";
+import upload from "../middlewares/upload.middleware.js";
 
 const router = express.Router();
 
@@ -70,6 +73,14 @@ router.patch(
   authMiddleware,
   validate(changePasswordSchema),
   changePasswordController,
+);
+
+router.patch(
+  "/profile",
+  authMiddleware,
+  upload.single("avatar"),
+  validate(updateProfileSchema),
+  updateProfilePicController,
 );
 
 export default router;
