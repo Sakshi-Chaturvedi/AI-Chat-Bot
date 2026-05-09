@@ -188,3 +188,36 @@ export const resetPasswordService = async (userData = {}) => {
 
   return user;
 };
+
+// ! Resend Verification Email Service
+export const resendVerificationService = async (userEmail = {}) => {
+  const email = userEmail?.email?.toLowerCase().trim();
+
+  if (!email) {
+    throw new ErrorHandler("Email is required.", 400);
+  }
+
+  const user = await userModel.findOne({ email });
+
+  if (!user) {
+    throw new ErrorHandler("User not found.", 404);
+  }
+
+  if (user.isVerified === true) {
+    throw new ErrorHandler("User already verified.", 400);
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
+
+  user.verificationToken = hashedToken;
+  user.verificationExpire = Date.now() + 15 * 60 * 1000;
+
+  await user.save({ validateBeforeSave: false });
+
+  return rawToken;
+};

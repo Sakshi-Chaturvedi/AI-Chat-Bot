@@ -7,6 +7,7 @@ import {
   getUserProfileService,
   loginUserService,
   registerUserService,
+  resendVerificationService,
   resetPasswordService,
   verifyUser,
 } from "../services/auth.service.js";
@@ -47,7 +48,15 @@ export const registerController = catchAsyncError(async (req, res, next) => {
 
   await user.save({ validateBeforeSave: false });
 
-  const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${rawToken}`;
+  const frontendURL =
+    process.env.FRONTEND_URL && process.env.FRONTEND_URL !== "undefined"
+      ? process.env.FRONTEND_URL
+      : "http://localhost:5173";
+
+  const verifyURL = `${frontendURL}/verify-email/${rawToken}`;
+
+  console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+  console.log("Verify URL:", verifyURL);
 
   try {
     await sendEmail({
@@ -56,7 +65,6 @@ export const registerController = catchAsyncError(async (req, res, next) => {
       message: `Click to verify your email : ${verifyURL}`,
     });
 
-    // ! Recommended: don't auto-login before email verification
     return res.status(201).json({
       success: true,
       message: "User registered successfully. Please verify your email.",
@@ -238,5 +246,47 @@ export const resetPassWordController = catchAsyncError(
       message: "Password has been reset",
       resetPassword,
     });
+  },
+);
+
+// ! Resend-Verification-Email-Controller ------------------>>>>>>>>>>>>>>>>>>>>>>>>>
+export const resendEmailVerification = catchAsyncError(
+  async (req, res, next) => {
+    const email = req.body.email?.toLowerCase().trim();
+
+    const resendToken = await resendVerificationService({ email });
+
+    const frontendURL =
+      process.env.FRONTEND_URL && process.env.FRONTEND_URL !== "undefined"
+        ? process.env.FRONTEND_URL
+        : "http://localhost:5173";
+
+    const verifyURL = `${frontendURL}/verify-email/${resendToken}`;
+
+    try {
+      await sendEmail({
+        email,
+        subject: "Verify your email",
+        message: `Click here to verify your email: ${verifyURL}`,
+      });
+      console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+      console.log("Verify URL:", verifyURL);
+      res.status(200).json({
+        success: true,
+        message: `Verification email sent to: ${email}`,
+      });
+    } catch (error) {
+      const user = await userModel.findOne({ email });
+
+      if (user) {
+        user.verificationToken = undefined;
+        user.verificationExpire = undefined;
+        await user.save({ validateBeforeSave: false });
+      }
+
+      return next(
+        new ErrorHandler("Verification email could not be sent.", 500),
+      );
+    }
   },
 );

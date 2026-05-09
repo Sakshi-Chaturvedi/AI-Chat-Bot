@@ -4,6 +4,7 @@ import {
   loginController,
   logoutController,
   registerController,
+  resendEmailVerification,
   resetPassWordController,
   userProfileController,
   userVerification,
@@ -15,6 +16,7 @@ import {
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resendVerificationSchema,
   resetPasswordSchema,
 } from "../validations/auth.validation.js";
 
@@ -53,4 +55,10 @@ router.patch(
   resetPassWordController,
 );
 
+router.post(
+  "/resend-verification",
+  authLimiter,
+  validate(resendVerificationSchema),
+  resendEmailVerification,
+);
 export default router;
