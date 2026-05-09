@@ -46,6 +46,23 @@ const userSchema = new mongoose.Schema(
         default: null,
       },
     },
+
+    usage: {
+      dailyMessages: {
+        type: Number,
+        default: 0,
+      },
+      lastResetDate: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+    plan: {
+      type: String,
+      enum: ["free", "pro"],
+      default: "free",
+    },
+    
     // ? Auth
     refreshToken: String,
 

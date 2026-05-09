@@ -1,13 +1,6 @@
 import Joi from "joi";
 
 export const createMessageValidation = Joi.object({
-  conversationId: Joi.string().hex().length(24).required().messages({
-    "string.empty": "Conversation ID is required.",
-    "any.required": "Conversation ID is required.",
-    "string.hex": "Invalid Conversation ID.",
-    "string.length": "Invalid Conversation ID.",
-  }),
-
   content: Joi.string().trim().min(1).max(4000).required().messages({
     "string.empty": "Message content is required.",
     "any.required": "Message content is required.",

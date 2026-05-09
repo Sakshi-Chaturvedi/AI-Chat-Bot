@@ -8,10 +8,11 @@ import {
 } from "../controllers/message.controller.js";
 import validate from "../middlewares/validate.middleware.js";
 import authMiddleWare from "../middlewares/auth.middleware.js";
-import { createMessageValidation } from "../validations/message.validation.js";
+import { createMessageValidation, updateMessageValidation } from "../validations/message.validation.js";
 import { messageLimiter } from "../middlewares/messageLimiter.middleware.js";
 
 const router = express.Router();
+
 
 router.get("/check", (req, res) => {
   res.send("Message API working properly.");
@@ -27,14 +28,19 @@ router.post(
 
 router.get("/searchMessage/:id", authMiddleWare, searchMessagecontroller);
 
-router.get("/:id", authMiddleWare, getMessageController);
-
-router.patch("/:id", authMiddleWare, editMessageController);
-
 router.patch(
-  "/regenrateReply/:id",
+  "/regenerate-reply/:id",
   authMiddleWare,
   regenerateMessageController,
+);
+
+router.get("/:id", authMiddleWare, getMessageController);
+
+router.patch(
+  "/:id",
+  authMiddleWare,
+  validate(updateMessageValidation),
+  editMessageController,
 );
 
 export default router;

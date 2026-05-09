@@ -2,6 +2,8 @@ import { ErrorHandler } from "../middlewares/error.middleware.js";
 import Conversation from "../models/conversation.model.js";
 import messageModel from "../models/message.model.js";
 import mongoose from "mongoose";
+import userModel from "../models/user.model.js";
+import { MESSAGE_LIMITS } from "../constants/limits.js";
 
 // ! Title Generator Function ----------------->>>>>>>>>>>>>>>>>>>>>>>>>>.............................
 const generateTitleFromMessage = (content = "") => {
@@ -25,6 +27,37 @@ export const createMessageService = async (userMessage = {}) => {
     );
   }
 
+  const user = await userModel.findById(userId);
+
+  if (!user) throw new ErrorHandler("User not found.", 400);
+
+  if (!user.usage) {
+    user.usage = {
+      dailyMessages: 0,
+      lastResetDate: new Date(),
+    };
+  }
+
+  const today = new Date().toDateString();
+  const lastResetDate = new Date(user.usage.lastResetDate).toDateString();
+
+  if (today !== lastResetDate) {
+    user.usage.dailyMessages = 0;
+    user.usage.lastResetDate = new Date();
+    await user.save({ validateBeforeSave: false });
+  }
+  const userPlan = user.plan || "free";
+  const dailyLimit = MESSAGE_LIMITS[userPlan] || MESSAGE_LIMITS.free;
+
+  console.log(userPlan, dailyLimit);
+
+  if (user.usage.dailyMessages >= dailyLimit) {
+    throw new ErrorHandler(
+      `Daily message limit reached. Your ${userPlan} plan allows ${dailyLimit} messages per day.`,
+      429,
+    );
+  }
+
   const conversation = await Conversation.findOne({
     _id: conversationId,
     user: userId,
@@ -39,6 +72,8 @@ export const createMessageService = async (userMessage = {}) => {
     user: userId,
   });
 
+  console.log(existingMessages);
+
   // ? Save user message
   const message = await messageModel.create({
     conversation: conversationId,
@@ -47,6 +82,9 @@ export const createMessageService = async (userMessage = {}) => {
     content,
     status: "completed",
   });
+
+  user.usage.dailyMessages += 1;
+  await user.save({ validateBeforeSave: false });
 
   // ? Generate Conversation title if it's new conversation
   if (existingMessages === 0 && conversation.title === "New Chat") {
