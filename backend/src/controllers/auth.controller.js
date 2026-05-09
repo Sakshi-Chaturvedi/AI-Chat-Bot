@@ -3,6 +3,7 @@ import catchAsyncError from "../middlewares/catchAsyncError.js";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
 import userModel from "../models/user.model.js";
 import {
+  changePasswordService,
   forgotPasswordService,
   getUserProfileService,
   loginUserService,
@@ -288,5 +289,27 @@ export const resendEmailVerification = catchAsyncError(
         new ErrorHandler("Verification email could not be sent.", 500),
       );
     }
+  },
+);
+
+
+// ! Change Password Controller ----------------->>>>>>>>>>>>>>>>>>>>>>
+export const changePasswordController = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.user?._id || req.user?.id;
+
+    const { currPassword, newPassword, confirmPassword } = req.body;
+
+    await changePasswordService({
+      uid,
+      currPassword,
+      newPassword,
+      confirmPassword,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Password has been changed successfully.",
+    });
   },
 );

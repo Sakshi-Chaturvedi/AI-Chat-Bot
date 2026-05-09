@@ -221,3 +221,46 @@ export const resendVerificationService = async (userEmail = {}) => {
 
   return rawToken;
 };
+
+// ! Change Password Service ---------------->>>>>>>>>>>>>>>>>>>>>>>>>>
+export const changePasswordService = async ({
+  uid,
+  currPassword,
+  newPassword,
+  confirmPassword,
+}) => {
+  if (!uid) {
+    throw new ErrorHandler("Unauthorized.", 401);
+  }
+
+  if (!currPassword || !newPassword || !confirmPassword) {
+    throw new ErrorHandler("All password fields are required.", 400);
+  }
+
+  if (newPassword !== confirmPassword) {
+    throw new ErrorHandler(
+      "New password and confirm password do not match.",
+      400,
+    );
+  }
+
+  const user = await userModel.findById(uid).select("+password");
+
+  if (!user) {
+    throw new ErrorHandler("User not found.", 404);
+  }
+
+  const isPasswordMatched = await user.comparePassword(currPassword);
+
+  if (!isPasswordMatched) {
+    throw new ErrorHandler("Current password is not correct.", 400);
+  }
+
+  user.password = newPassword;
+
+  await user.save();
+
+  return true;
+};
+
+

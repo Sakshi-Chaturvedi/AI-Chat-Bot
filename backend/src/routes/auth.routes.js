@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  changePasswordController,
   forgotPasswordController,
   loginController,
   logoutController,
@@ -13,6 +14,7 @@ import authMiddleware from "../middlewares/auth.middleware.js";
 import authLimiter from "../middlewares/authLimiter.middleware.js";
 import validate from "../middlewares/validate.middleware.js";
 import {
+  changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
@@ -61,4 +63,13 @@ router.post(
   validate(resendVerificationSchema),
   resendEmailVerification,
 );
+
+router.patch(
+  "/changePassword",
+  authLimiter,
+  authMiddleware,
+  validate(changePasswordSchema),
+  changePasswordController,
+);
+
 export default router;
