@@ -4,6 +4,7 @@ import messageModel from "../models/message.model.js";
 import mongoose from "mongoose";
 import userModel from "../models/user.model.js";
 import { MESSAGE_LIMITS } from "../constants/limits.js";
+import { generateAIResponse } from "./ai.service.js";
 
 // ! Title Generator Function ----------------->>>>>>>>>>>>>>>>>>>>>>>>>>.............................
 const generateTitleFromMessage = (content = "") => {
@@ -101,11 +102,13 @@ export const createMessageService = async (userMessage = {}) => {
   });
 
   // ? Dummy AI response — ABHI YAHI LIKHNA HAI
-  const aiResponse = `You asked: ${content}. I am your AI assistant 🤖`;
+  const aiResponse = await generateAIResponse({ prompt: content });
 
   // ? Update assistant message
-  assistantMessage.content = aiResponse;
+  assistantMessage.content = aiResponse.response;
   assistantMessage.status = "completed";
+  assistantMessage.model = aiResponse.model;
+  assistantMessage.tokensUsed = aiResponse.tokensUsed;
   await assistantMessage.save();
 
   conversation.lastMessageAt = new Date();
@@ -203,11 +206,13 @@ export const editMessageService = async (userMessage = {}) => {
     })
     .sort({ createdAt: 1 });
 
-  const updatedAiAnswer = `You asked: ${content}. This is your updated answer 🤖`;
+  const updatedAiAnswer = await generateAIResponse({ prompt: content });
 
   if (assistantReply) {
-    assistantReply.content = updatedAiAnswer;
+    assistantReply.content = updatedAiAnswer.response;
     assistantReply.status = "completed";
+    assistantReply.model = updatedAiAnswer.model;
+    assistantReply.tokensUsed = updatedAiAnswer.tokensUsed;
     await assistantReply.save();
   } else {
     assistantReply = await messageModel.create({
@@ -229,12 +234,9 @@ export const editMessageService = async (userMessage = {}) => {
 };
 
 // ! Regenerate Assistant reply for particular chat Service ------------>>>>>>>>>>>>>>>>>>>.................
-export const regenerateReplyService = async (messageData = {}) => {
-  const mid = messageData.mid;
-  const uid = messageData.uid;
-
+export const regenerateReplyService = async ({ mid, uid }) => {
   if (!mid) {
-    throw new ErrorHandler("Message id is required.", 400);
+    throw new ErrorHandler("Message ID is required.", 400);
   }
 
   if (!mongoose.Types.ObjectId.isValid(mid)) {
@@ -242,7 +244,7 @@ export const regenerateReplyService = async (messageData = {}) => {
   }
 
   if (!uid) {
-    throw new ErrorHandler("User id is required.", 401);
+    throw new ErrorHandler("Unauthorized.", 401);
   }
 
   const assistantMessage = await messageModel.findById(mid);
@@ -261,7 +263,7 @@ export const regenerateReplyService = async (messageData = {}) => {
   });
 
   if (!conversation) {
-    throw new ErrorHandler("Conversation not Found.", 404);
+    throw new ErrorHandler("Conversation not found or unauthorized.", 404);
   }
 
   const previousUserMessage = await messageModel
@@ -281,10 +283,14 @@ export const regenerateReplyService = async (messageData = {}) => {
   assistantMessage.content = "";
   await assistantMessage.save();
 
-  const regeneratedAnswer = `Regenerated answer for: ${previousUserMessage.content} 🤖`;
+  const aiResult = await generateAIResponse({
+    prompt: previousUserMessage.content,
+  });
 
-  assistantMessage.content = regeneratedAnswer;
+  assistantMessage.content = aiResult.response;
   assistantMessage.status = "completed";
+  assistantMessage.model = aiResult.model;
+  assistantMessage.tokensUsed = aiResult.tokensUsed;
   await assistantMessage.save();
 
   conversation.updatedAt = new Date();

@@ -1,4 +1,4 @@
 export const MESSAGE_LIMITS = {
-  free: 2,
+  free: 20,
   pro: 200,
 };
