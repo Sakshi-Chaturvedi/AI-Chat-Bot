@@ -87,6 +87,20 @@ export const createMessageService = async (userMessage = {}) => {
   user.usage.dailyMessages += 1;
   await user.save({ validateBeforeSave: false });
 
+  // ? Fetch recent conversation history for AI context
+  const recentMessages = await messageModel
+    .find({
+      conversation: conversationId,
+      user: userId,
+      status: "completed",
+    })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .select("role content")
+    .lean();
+
+  const conversationHistory = recentMessages.reverse();
+
   // ? Generate Conversation title if it's new conversation
   if (existingMessages === 0 && conversation.title === "New Chat") {
     conversation.title = generateTitleFromMessage(content);
@@ -102,7 +116,10 @@ export const createMessageService = async (userMessage = {}) => {
   });
 
   // ? Dummy AI response — ABHI YAHI LIKHNA HAI
-  const aiResponse = await generateAIResponse({ prompt: content });
+  const aiResponse = await generateAIResponse({
+    prompt: content,
+    history: conversationHistory,
+  });
 
   // ? Update assistant message
   assistantMessage.content = aiResponse.response;
@@ -283,8 +300,23 @@ export const regenerateReplyService = async ({ mid, uid }) => {
   assistantMessage.content = "";
   await assistantMessage.save();
 
+  const recentMessages = await messageModel
+    .find({
+      conversation: assistantMessage.conversation,
+      user: userId,
+      status: "completed",
+      createdAt: { $lt: assistantMessage.createdAt },
+    })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .select("role content")
+    .lean();
+
+  const history = recentMessages.reverse();
+
   const aiResult = await generateAIResponse({
     prompt: previousUserMessage.content,
+    history,
   });
 
   assistantMessage.content = aiResult.response;

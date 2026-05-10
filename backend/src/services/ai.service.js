@@ -1,12 +1,21 @@
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
 
-
-export const generateAIResponse = async ({ prompt }) => {
+export const generateAIResponse = async ({ prompt, history = [] }) => {
   try {
     if (!prompt || !prompt.trim()) {
       throw new ErrorHandler("Prompt is required.", 400);
     }
+
+    const formattedPrompt = `
+You are a helpful AI assistant.
+
+Conversation history:
+${history.map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`).join("\n")}
+
+User's latest message:
+${prompt}
+`;
 
     if (!process.env.GEMINI_API_KEY) {
       throw new ErrorHandler("Gemini API key is missing.", 500);
@@ -20,7 +29,7 @@ export const generateAIResponse = async ({ prompt }) => {
 
     const result = await genAI.models.generateContent({
       model: modelName,
-      contents: prompt.trim(),
+      contents: formattedPrompt.trim(),
 
       config: {
         systemInstruction: `
