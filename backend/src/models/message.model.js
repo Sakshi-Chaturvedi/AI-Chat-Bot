@@ -34,10 +34,15 @@ const messageSchema = new mongoose.Schema(
       default: "pending",
     },
 
+    errorMessage: {
+      type: String,
+      default: null,
+    },
+
     tokensUsed: Number,
     model: String,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 messageSchema.index({ conversation: 1, createdAt: 1 });

@@ -115,23 +115,38 @@ export const createMessageService = async (userMessage = {}) => {
     status: "pending",
   });
 
-  // ? Dummy AI response — ABHI YAHI LIKHNA HAI
-  const aiResponse = await generateAIResponse({
-    prompt: content,
-    history: conversationHistory,
-  });
+  // ? Failure Handling in the Chatbot
+  try {
+    const aiResponse = await generateAIResponse({
+      prompt: content,
+      history: conversationHistory,
+    });
 
-  // ? Update assistant message
-  assistantMessage.content = aiResponse.response;
-  assistantMessage.status = "completed";
-  assistantMessage.model = aiResponse.model;
-  assistantMessage.tokensUsed = aiResponse.tokensUsed;
-  await assistantMessage.save();
+    assistantMessage.content = aiResponse.response;
+    assistantMessage.status = "completed";
+    assistantMessage.model = aiResponse.model;
+    assistantMessage.tokensUsed = aiResponse.tokensUsed;
+    await assistantMessage.save();
 
-  conversation.lastMessageAt = new Date();
-  await conversation.save();
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
 
-  return { message, assistantMessage };
+    return { message, assistantMessage };
+  } catch (error) {
+    assistantMessage.content =
+      "Sorry, I couldn't generate a response. Please try again.";
+    assistantMessage.status = "failed";
+    assistantMessage.errorMessage = error.message;
+    await assistantMessage.save();
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    throw new ErrorHandler(
+      error.message || "AI response generation failed.",
+      error.statusCode || 500,
+    );
+  }
 };
 
 // ! Get All Messages Service API -------------------->>>>>>>>>>>>>>>>>>>>>>>>..........................
@@ -223,31 +238,61 @@ export const editMessageService = async (userMessage = {}) => {
     })
     .sort({ createdAt: 1 });
 
-  const updatedAiAnswer = await generateAIResponse({ prompt: content });
+  try {
+    const updatedAiAnswer = await generateAIResponse({ prompt: content });
 
-  if (assistantReply) {
-    assistantReply.content = updatedAiAnswer.response;
-    assistantReply.status = "completed";
-    assistantReply.model = updatedAiAnswer.model;
-    assistantReply.tokensUsed = updatedAiAnswer.tokensUsed;
-    await assistantReply.save();
-  } else {
-    assistantReply = await messageModel.create({
-      conversation: message.conversation,
-      user: uid,
-      role: "assistant",
-      content: updatedAiAnswer,
-      status: "completed",
-    });
+    if (assistantReply) {
+      assistantReply.content = updatedAiAnswer.response;
+      assistantReply.status = "completed";
+      assistantReply.model = updatedAiAnswer.model;
+      assistantReply.tokensUsed = updatedAiAnswer.tokensUsed;
+      assistantReply.errorMessage = undefined;
+      await assistantReply.save();
+    } else {
+      assistantReply = await messageModel.create({
+        conversation: message.conversation,
+        user: uid,
+        role: "assistant",
+        content: updatedAiAnswer.response,
+        status: "completed",
+        model: updatedAiAnswer.model,
+        tokensUsed: updatedAiAnswer.tokensUsed,
+      });
+    }
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    return {
+      userMessage: message,
+      assistantReply,
+    };
+  } catch (error) {
+    if (assistantReply) {
+      assistantReply.content =
+        "Sorry, I couldn't generate a response. Please try again.";
+      assistantReply.status = "failed";
+      assistantReply.errorMessage = error.message;
+      await assistantReply.save();
+    } else {
+      assistantReply = await messageModel.create({
+        conversation: message.conversation,
+        user: uid,
+        role: "assistant",
+        content: "Sorry, I couldn't generate a response. Please try again.",
+        status: "failed",
+        errorMessage: error.message,
+      });
+    }
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    throw new ErrorHandler(
+      error.message || "AI response generation failed.",
+      error.statusCode || 500,
+    );
   }
-
-  conversation.updatedAt = new Date();
-  await conversation.save();
-
-  return {
-    userMessage: message,
-    assistantReply,
-  };
 };
 
 // ! Regenerate Assistant reply for particular chat Service ------------>>>>>>>>>>>>>>>>>>>.................
@@ -296,14 +341,19 @@ export const regenerateReplyService = async ({ mid, uid }) => {
     throw new ErrorHandler("Previous user message not found.", 404);
   }
 
+  if (!previousUserMessage.content?.trim()) {
+    throw new ErrorHandler("Previous user message content is empty.", 400);
+  }
+
   assistantMessage.status = "pending";
   assistantMessage.content = "";
+  assistantMessage.errorMessage = undefined;
   await assistantMessage.save();
 
   const recentMessages = await messageModel
     .find({
       conversation: assistantMessage.conversation,
-      user: userId,
+      user: uid,
       status: "completed",
       createdAt: { $lt: assistantMessage.createdAt },
     })
@@ -312,23 +362,53 @@ export const regenerateReplyService = async ({ mid, uid }) => {
     .select("role content")
     .lean();
 
-  const history = recentMessages.reverse();
+  const history = recentMessages
+    .reverse()
+    .filter((msg) => msg.content?.trim())
+    .map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
 
-  const aiResult = await generateAIResponse({
-    prompt: previousUserMessage.content,
-    history,
-  });
+  try {
+    const aiResult = await generateAIResponse({
+      prompt: previousUserMessage.content.trim(),
+      history,
+    });
 
-  assistantMessage.content = aiResult.response;
-  assistantMessage.status = "completed";
-  assistantMessage.model = aiResult.model;
-  assistantMessage.tokensUsed = aiResult.tokensUsed;
-  await assistantMessage.save();
+    if (!aiResult?.response) {
+      throw new ErrorHandler("Empty AI response received.", 500);
+    }
 
-  conversation.updatedAt = new Date();
-  await conversation.save();
+    assistantMessage.content = aiResult.response;
+    assistantMessage.status = "completed";
+    assistantMessage.model = aiResult.model;
+    assistantMessage.tokensUsed = aiResult.tokensUsed || 0;
+    assistantMessage.errorMessage = undefined;
 
-  return assistantMessage;
+    await assistantMessage.save();
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    return assistantMessage;
+  } catch (error) {
+    assistantMessage.content =
+      "Sorry, I couldn't generate a response. Please try again.";
+    assistantMessage.status = "failed";
+    assistantMessage.errorMessage =
+      error.message || "AI response generation failed.";
+
+    await assistantMessage.save();
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    throw new ErrorHandler(
+      error.message || "AI response generation failed.",
+      error.statusCode || 500,
+    );
+  }
 };
 
 // ! Search Message Service -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>......................
