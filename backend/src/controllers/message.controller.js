@@ -6,6 +6,7 @@ import {
   editMessageService,
   getAllMessagesService,
   regenerateReplyService,
+  retryFailedMessageService,
   searchMessageService,
 } from "../services/Message.service.js";
 
@@ -80,20 +81,37 @@ export const regenerateMessageController = catchAsyncError(
   },
 );
 
-
 // ! Search Message Controller ---------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>.........................
-export const searchMessagecontroller = catchAsyncError(async(req, res, next) => {
-  const uid = req.user.id || req.user._id;
-  const cid = req.params.id;
+export const searchMessagecontroller = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.user.id || req.user._id;
+    const cid = req.params.id;
 
-  const query = req.query.q;
+    const query = req.query.q;
 
-  const resultant = await searchMessageService({ uid, cid, query });
+    const resultant = await searchMessageService({ uid, cid, query });
 
-  res.status(200).json({
-    success: true,
-    message: "Message Fetched Successfully.",
-    count: resultant.length,
-    resultant
-  })
-})
+    res.status(200).json({
+      success: true,
+      message: "Message Fetched Successfully.",
+      count: resultant.length,
+      resultant,
+    });
+  },
+);
+
+// ! Retry Failed Message Controller -------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>........................
+export const retryFailedMessageController = catchAsyncError(
+  async (req, res, next) => {
+    const mid = req.params.id;
+    const uid = req.user?.id || req.user?._id;
+
+    const retryMessage = await retryFailedMessageService({ mid, uid });
+
+    res.status(200).json({
+      success: true,
+      message: "Message has been regenerated successfully.",
+      data: retryMessage,
+    });
+  },
+);

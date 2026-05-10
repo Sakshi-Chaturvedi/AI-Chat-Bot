@@ -446,3 +446,125 @@ export const searchMessageService = async (searchData = {}) => {
 
   return messages;
 };
+
+// ! Retry Failed Messages Service ----------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const retryFailedMessageService = async ({ mid, uid }) => {
+  if (!uid) {
+    throw new ErrorHandler("User ID is required.", 400);
+  }
+
+  if (!mid) {
+    throw new ErrorHandler("Message ID is required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(mid)) {
+    throw new ErrorHandler("Invalid message ID.", 400);
+  }
+
+  const message = await messageModel.findById(mid);
+
+  if (!message) {
+    throw new ErrorHandler("Message not found.", 404);
+  }
+
+  if (message.user.toString() !== uid.toString()) {
+    throw new ErrorHandler("Unauthorized user.", 403);
+  }
+
+  if (message.status !== "failed" || message.role !== "assistant") {
+    throw new ErrorHandler(
+      "Only failed assistant messages can be retried.",
+      400,
+    );
+  }
+
+  const conversation = await Conversation.findOne({
+    _id: message.conversation,
+    user: uid,
+  });
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found or unauthorized.", 404);
+  }
+
+  const previousUserMessage = await messageModel
+    .findOne({
+      conversation: message.conversation,
+      user: uid,
+      role: "user",
+      createdAt: { $lt: message.createdAt },
+    })
+    .sort({ createdAt: -1 });
+
+  if (!previousUserMessage) {
+    throw new ErrorHandler("Previous user message not found.", 404);
+  }
+
+  if (!previousUserMessage.content?.trim()) {
+    throw new ErrorHandler("Previous user message content is empty.", 400);
+  }
+
+  const recentMessages = await messageModel
+    .find({
+      conversation: message.conversation,
+      user: uid,
+      status: "completed",
+      createdAt: { $lt: message.createdAt },
+    })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .select("role content")
+    .lean();
+
+  const history = recentMessages
+    .reverse()
+    .filter((msg) => msg.content?.trim())
+    .map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+  message.status = "pending";
+  message.content = "";
+  message.errorMessage = undefined;
+  await message.save();
+
+  try {
+    const aiResult = await generateAIResponse({
+      prompt: previousUserMessage.content.trim(),
+      history,
+    });
+
+    if (!aiResult?.response) {
+      throw new ErrorHandler("Empty AI response received.", 500);
+    }
+
+    message.content = aiResult.response;
+    message.status = "completed";
+    message.model = aiResult.model;
+    message.tokensUsed = aiResult.tokensUsed || 0;
+    message.errorMessage = undefined;
+
+    await message.save();
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    return message;
+  } catch (error) {
+    message.content =
+      "Sorry, I couldn't generate a response. Please try again.";
+    message.status = "failed";
+    message.errorMessage = error.message || "AI response generation failed.";
+
+    await message.save();
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    throw new ErrorHandler(
+      error.message || "AI response generation failed.",
+      error.statusCode || 500,
+    );
+  }
+};

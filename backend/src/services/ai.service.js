@@ -80,9 +80,15 @@ Coding behavior:
       throw error;
     }
 
-    throw new ErrorHandler(
-      error.message || "AI response generation failed.",
-      500,
-    );
+    console.error("Gemini API Error:", error.message);
+
+    let cleanMessage = "AI response generation failed.";
+
+    if (error.message?.includes("API key not valid")) {
+      cleanMessage =
+        "AI service authentication failed. Please contact support.";
+    }
+
+    throw new ErrorHandler(cleanMessage, 500);
   }
 };

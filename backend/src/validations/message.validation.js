@@ -17,3 +17,4 @@ export const updateMessageValidation = Joi.object({
     "string.max": "Message content cannot be more than 4000 characters.",
   }),
 });
+
