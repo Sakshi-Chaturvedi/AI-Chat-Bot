@@ -9,12 +9,13 @@ import {
   regenerateReplyService,
   retryFailedMessageService,
   searchMessageService,
+  streamMessageService,
 } from "../services/Message.service.js";
 
 // ! Create Message API ------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>.......................
 export const createMessageController = catchAsyncError(
   async (req, res, next) => {
-    const user = req.user.id;
+    const user = req.user?.id || req.user?._id;
     const conversationId = req.params.id;
     const { content } = req.body;
 
@@ -132,3 +133,40 @@ export const cancelReplyGenerationController = catchAsyncError(
     });
   },
 );
+
+// ! Stream Message Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>..........................
+export const streamMessageController = async (req, res) => {
+  const userId = req.user?.id || req.user?._id;
+  const conversationId = req.params.id;
+  
+  const { content } = req.body;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  res.flushHeaders?.();
+
+  const sendEvent = (event, data) => {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    await streamMessageService({
+      userId,
+      conversationId,
+      content,
+      sendEvent,
+    });
+
+    return res.end();
+  } catch (error) {
+    sendEvent("error", {
+      message: error.message || "Something went wrong while streaming.",
+    });
+
+    return res.end();
+  }
+};

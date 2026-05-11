@@ -4,7 +4,9 @@ import messageModel from "../models/message.model.js";
 import mongoose from "mongoose";
 import userModel from "../models/user.model.js";
 import { MESSAGE_LIMITS } from "../constants/limits.js";
-import { generateAIResponse } from "./ai.service.js";
+// import { generateAIResponse } from "./ai.service.js";
+// import { generateAIStream } from "../utils/generateAIStream.js";
+import { generateAIResponse } from "../ai/ai.service.js";
 
 // ! Title Generator Function ----------------->>>>>>>>>>>>>>>>>>>>>>>>>>.............................
 const generateTitleFromMessage = (content = "") => {
@@ -28,7 +30,10 @@ export const createMessageService = async (userMessage = {}) => {
     );
   }
 
+  
+  
   const user = await userModel.findById(userId);
+
 
   if (!user) throw new ErrorHandler("User not found.", 400);
 
@@ -50,7 +55,7 @@ export const createMessageService = async (userMessage = {}) => {
   const userPlan = user.plan || "free";
   const dailyLimit = MESSAGE_LIMITS[userPlan] || MESSAGE_LIMITS.free;
 
-  console.log(userPlan, dailyLimit);
+  
 
   if (user.usage.dailyMessages >= dailyLimit) {
     throw new ErrorHandler(
@@ -117,8 +122,6 @@ export const createMessageService = async (userMessage = {}) => {
 
   // ? Failure Handling in the Chatbot
   try {
-    // temporary delay for testing cancel API
-    await new Promise((resolve) => setTimeout(resolve, 15000));
     const aiResponse = await generateAIResponse({
       prompt: content,
       history: conversationHistory,
@@ -618,4 +621,183 @@ export const cancelMessageGenerationService = async ({ uid, amid }) => {
   await conversation.save();
 
   return assistantMessage;
+};
+
+// ! Stream Message Response ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const streamMessageService = async ({
+  userId,
+  conversationId,
+  content,
+  sendEvent,
+}) => {
+  if (!userId) {
+    throw new ErrorHandler("User ID is required.", 401);
+  }
+
+  if (!conversationId) {
+    throw new ErrorHandler("Conversation ID is required.", 400);
+  }
+
+  if (!content || !content.trim()) {
+    throw new ErrorHandler("Message content is required.", 400);
+  }
+
+  const user = await userModel.findById(userId);
+
+  if (!user) {
+    throw new ErrorHandler("User not found.", 404);
+  }
+
+  if (!user.usage) {
+    user.usage = {
+      dailyMessages: 0,
+      lastResetDate: new Date(),
+    };
+  }
+
+  const today = new Date().toDateString();
+  const lastResetDate = new Date(user.usage.lastResetDate).toDateString();
+
+  if (today !== lastResetDate) {
+    user.usage.dailyMessages = 0;
+    user.usage.lastResetDate = new Date();
+    await user.save({ validateBeforeSave: false });
+  }
+
+  const userPlan = user.plan || "free";
+  const dailyLimit = MESSAGE_LIMITS[userPlan] || MESSAGE_LIMITS.free;
+
+  if (user.usage.dailyMessages >= dailyLimit) {
+    throw new ErrorHandler(
+      `Daily message limit reached. Your ${userPlan} plan allows ${dailyLimit} messages per day.`,
+      429,
+    );
+  }
+
+  const conversation = await Conversation.findOne({
+    _id: conversationId,
+    user: userId,
+  });
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found or unauthorized.", 404);
+  }
+
+  const userMessage = await messageModel.create({
+    conversation: conversationId,
+    user: userId,
+    role: "user",
+    content: content.trim(),
+    status: "completed",
+  });
+
+  const assistantMessage = await messageModel.create({
+    conversation: conversationId,
+    user: userId,
+    role: "assistant",
+    content: "",
+    status: "pending",
+  });
+
+  user.usage.dailyMessages += 1;
+  await user.save({ validateBeforeSave: false });
+
+  sendEvent("start", {
+    userMessageId: userMessage._id,
+    assistantMessageId: assistantMessage._id,
+  });
+
+  let fullResponse = "";
+
+  try {
+    const recentMessages = await messageModel
+      .find({
+        conversation: conversationId,
+        user: userId,
+        status: "completed",
+        createdAt: { $lt: assistantMessage.createdAt },
+      })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select("role content")
+      .lean();
+
+    const history = recentMessages
+      .reverse()
+      .filter((msg) => msg.content?.trim())
+      .map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+    const { stream, model } = await generateAIStream({
+      prompt: content.trim(),
+      history,
+    });
+
+    for await (const chunk of stream) {
+      const chunkText = chunk.text || "";
+
+      if (!chunkText) continue;
+
+      fullResponse += chunkText;
+
+      sendEvent("chunk", {
+        assistantMessageId: assistantMessage._id,
+        text: chunkText,
+      });
+    }
+
+    const latestAssistantMessage = await messageModel.findById(
+      assistantMessage._id,
+    );
+
+    if (latestAssistantMessage.status === "cancelled") {
+      return {
+        userMessage,
+        assistantMessage: latestAssistantMessage,
+      };
+    }
+
+    assistantMessage.content = fullResponse;
+    assistantMessage.status = "completed";
+    assistantMessage.model = model;
+    assistantMessage.tokensUsed = 0;
+    assistantMessage.errorMessage = undefined;
+
+    await assistantMessage.save();
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    sendEvent("done", {
+      userMessageId: userMessage._id,
+      assistantMessageId: assistantMessage._id,
+      fullResponse,
+    });
+
+    return {
+      userMessage,
+      assistantMessage,
+    };
+  } catch (error) {
+    assistantMessage.content =
+      fullResponse ||
+      "Sorry, I couldn't generate a response. Please try again.";
+    assistantMessage.status = "failed";
+    assistantMessage.errorMessage =
+      error.message || "AI streaming generation failed.";
+
+    await assistantMessage.save();
+
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    sendEvent("error", {
+      message: error.message || "AI streaming generation failed.",
+      assistantMessageId: assistantMessage._id,
+    });
+
+    throw error;
+  }
 };

@@ -7,6 +7,7 @@ import {
   regenerateMessageController,
   retryFailedMessageController,
   searchMessagecontroller,
+  streamMessageController,
 } from "../controllers/message.controller.js";
 import validate from "../middlewares/validate.middleware.js";
 import authMiddleWare from "../middlewares/auth.middleware.js";
@@ -28,6 +29,14 @@ router.post(
   messageLimiter,
   validate(createMessageValidation),
   createMessageController,
+);
+
+router.post(
+  "/stream/:id",
+  authMiddleWare,
+  messageLimiter,
+  validate(createMessageValidation),
+  streamMessageController,
 );
 
 router.get("/searchMessage/:id", authMiddleWare, searchMessagecontroller);
@@ -60,5 +69,7 @@ router.post(
   messageLimiter,
   retryFailedMessageController,
 );
+
+
 
 export default router;
