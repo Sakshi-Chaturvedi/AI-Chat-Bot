@@ -2,6 +2,7 @@ import catchAsyncError from "../middlewares/catchAsyncError.js";
 
 import messageModel from "../models/message.model.js";
 import {
+  cancelMessageGenerationService,
   createMessageService,
   editMessageService,
   getAllMessagesService,
@@ -112,6 +113,22 @@ export const retryFailedMessageController = catchAsyncError(
       success: true,
       message: "Message has been regenerated successfully.",
       data: retryMessage,
+    });
+  },
+);
+
+// ! Cancel Message Generation Controller ---------------->>>>>>>>>>>>>>>>>>>>>>>>>................................
+export const cancelReplyGenerationController = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.user?.id || req.user?._id;
+    const amid = req.params?.id;
+
+    const cancelledReply = await cancelMessageGenerationService({ uid, amid });
+
+    res.status(200).json({
+      success: true,
+      message: "Assistant message generation cancelled successfully.",
+      data: cancelledReply,
     });
   },
 );

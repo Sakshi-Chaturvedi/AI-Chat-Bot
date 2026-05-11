@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  cancelReplyGenerationController,
   createMessageController,
   editMessageController,
   getMessageController,
@@ -39,6 +40,12 @@ router.patch(
 );
 
 router.get("/:id", authMiddleWare, getMessageController);
+
+router.patch(
+  "cancel-message/:id",
+  authMiddleWare,
+  cancelReplyGenerationController,
+);
 
 router.patch(
   "/:id",

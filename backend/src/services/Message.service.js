@@ -117,6 +117,8 @@ export const createMessageService = async (userMessage = {}) => {
 
   // ? Failure Handling in the Chatbot
   try {
+    // temporary delay for testing cancel API
+    await new Promise((resolve) => setTimeout(resolve, 15000));
     const aiResponse = await generateAIResponse({
       prompt: content,
       history: conversationHistory,
@@ -567,4 +569,53 @@ export const retryFailedMessageService = async ({ mid, uid }) => {
       error.statusCode || 500,
     );
   }
+};
+
+// ! Cancel Assistent Message Generation --------------------->>>>>>>>>>>>>>>>>>>>>>
+export const cancelMessageGenerationService = async ({ uid, amid }) => {
+  if (!uid) {
+    throw new ErrorHandler("User ID is required.", 400);
+  }
+
+  if (!amid) {
+    throw new ErrorHandler("Assistant message ID is required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(amid)) {
+    throw new ErrorHandler("Invalid assistant message ID.", 400);
+  }
+
+  const assistantMessage = await messageModel.findById(amid);
+
+  if (!assistantMessage) {
+    throw new ErrorHandler("Assistant message not found.", 404);
+  }
+
+  if (assistantMessage.role !== "assistant") {
+    throw new ErrorHandler("Only assistant messages can be cancelled.", 400);
+  }
+
+  if (assistantMessage.status !== "pending") {
+    throw new ErrorHandler("Only pending messages can be cancelled.", 400);
+  }
+
+  const conversation = await Conversation.findOne({
+    _id: assistantMessage.conversation,
+    user: uid,
+  });
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found or unauthorized.", 404);
+  }
+
+  assistantMessage.status = "cancelled";
+  assistantMessage.content = "Response generation stopped.";
+  assistantMessage.errorMessage = undefined;
+
+  await assistantMessage.save();
+
+  conversation.lastMessageAt = new Date();
+  await conversation.save();
+
+  return assistantMessage;
 };
