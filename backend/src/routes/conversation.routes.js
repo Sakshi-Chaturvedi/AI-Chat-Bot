@@ -7,6 +7,7 @@ import {
   getSingleConversationController,
   getUserConversationController,
   searchConversationController,
+  shareConversationController,
   togglePinConversationController,
   updateConversationController,
 } from "../controllers/conversation.controller.js";
@@ -37,6 +38,8 @@ router.get("/conversations", authMiddleWare, getUserConversationController);
 router.get("/searchConversation", authMiddleWare, searchConversationController);
 
 router.get("/:id/export", authMiddleWare, exportConversationController);
+
+router.post("/:id/share", authMiddleWare, shareConversationController);
 
 router.get(
   "/conversation/:id",

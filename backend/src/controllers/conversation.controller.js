@@ -8,6 +8,7 @@ import {
   getSingleConversationService,
   getUserConversationService,
   searchConversationService,
+  shareConversationService,
   togglePinConversationService,
   updateConversationService,
 } from "../services/conversation.service.js";
@@ -194,6 +195,27 @@ export const exportConversationController = catchAsyncError(
       success: true,
       message: "Conversation has been exported successfully.",
       exportedChats,
+    });
+  },
+);
+
+// ! Share Conversation Controller ----------------------->>>>>>>>>>>>>>>>>>>>>>>......................
+export const shareConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.user?.id || req.user?._id;
+    const cid = req.params?.id;
+
+    const sharedData = await shareConversationService({ uid, cid });
+
+    res.status(200).json({
+      success: true,
+      message: "Share link generated successfully.",
+      data: {
+        shareId: "abc123...",
+        shareUrl: "http://localhost:5173/share/abc123...",
+        isShared: true,
+        sharedAt: "2026-05-12T...",
+      },
     });
   },
 );

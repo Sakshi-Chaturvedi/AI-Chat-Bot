@@ -3,6 +3,7 @@ import { ErrorHandler } from "../middlewares/error.middleware.js";
 import Conversation from "../models/conversation.model.js";
 import User from "../models/user.model.js";
 import messageModel from "../models/message.model.js";
+import crypto from "crypto"
 
 // ! Create Conversation Service -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>..............................
 export const createConversationService = async (userData = {}) => {
@@ -365,4 +366,51 @@ ${msg.content || ""}
       data: markdownContent.trim(),
     };
   }
+};
+
+
+// ! Share Conversation Service ------------------->>>>>>>>>>>>>>>>>>>>>>>>>
+export const shareConversationService = async ({ uid, cid }) => {
+  if (!uid) {
+    throw new ErrorHandler("User id is required.", 400);
+  }
+
+  if (!cid) {
+    throw new ErrorHandler("Conversation id is required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(cid)) {
+    throw new ErrorHandler("Invalid conversation id.", 400);
+  }
+
+  const conversation = await Conversation.findOne({
+    _id: cid,
+    user: uid,
+  });
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found or unauthorized.", 404);
+  }
+
+  if (conversation.isShared && conversation.shareId) {
+    return {
+      shareId: conversation.shareId,
+      isShared: true,
+      sharedAt: conversation.sharedAt,
+    };
+  }
+
+  const shareId = crypto.randomBytes(24).toString("hex");
+
+  conversation.isShared = true;
+  conversation.shareId = shareId;
+  conversation.sharedAt = new Date();
+
+  await conversation.save();
+
+  return {
+    shareId: conversation.shareId,
+    isShared: conversation.isShared,
+    sharedAt: conversation.sharedAt,
+  };
 };

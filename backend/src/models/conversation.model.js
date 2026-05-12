@@ -26,6 +26,22 @@ const conversationSchema = new mongoose.Schema(
       default: false,
     },
 
+    isShared: {
+      type: Boolean,
+      default: false,
+    },
+
+    shareId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+
+    sharedAt: {
+      type: Date,
+    },
+
     lastMessageAt: {
       type: Date,
       default: Date.now,
