@@ -7,7 +7,8 @@ import { MESSAGE_LIMITS } from "../constants/limits.js";
 // import { generateAIResponse } from "./ai.service.js";
 // import { generateAIStream } from "../utils/generateAIStream.js";
 import { generateAIResponse } from "../ai/ai.service.js";
-
+import { generateOpenRouterStream } from "../ai/providers/openrouter-stream.provider.js";
+import {readOpenRouterStream} from "../utils/readOpenRouterStream.js"
 // ! Title Generator Function ----------------->>>>>>>>>>>>>>>>>>>>>>>>>>.............................
 const generateTitleFromMessage = (content = "") => {
   const cleanText = content.trim().replace(/\s+/g, " ");
@@ -730,23 +731,21 @@ export const streamMessageService = async ({
         content: msg.content,
       }));
 
-    const { stream, model } = await generateAIStream({
+    const { stream, model } = await generateOpenRouterStream({
       prompt: content.trim(),
       history,
     });
 
-    for await (const chunk of stream) {
-      const chunkText = chunk.text || "";
+    for await (const chunkText of readOpenRouterStream(stream)) {
+  if (!chunkText) continue;
 
-      if (!chunkText) continue;
+  fullResponse += chunkText;
 
-      fullResponse += chunkText;
-
-      sendEvent("chunk", {
-        assistantMessageId: assistantMessage._id,
-        text: chunkText,
-      });
-    }
+  sendEvent("chunk", {
+    assistantMessageId: assistantMessage._id,
+    text: chunkText,
+  });
+}
 
     const latestAssistantMessage = await messageModel.findById(
       assistantMessage._id,

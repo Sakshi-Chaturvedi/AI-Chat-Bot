@@ -246,3 +246,123 @@ export const searchConversationService = async (searchData = {}) => {
 
   return conversations;
 };
+
+// ! Export Conversation Service --------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const exportConversationService = async ({ uid, cid, format }) => {
+  if (!uid) throw new ErrorHandler("User Id is Required.", 400);
+
+  if (!cid) {
+    throw new ErrorHandler(
+      "Conversation id is required for exporting Conversation.",
+      400,
+    );
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(cid)) {
+    throw new ErrorHandler("Invalid Conversation Id.", 400);
+  }
+
+  const allowedFormats = ["json", "markdown"];
+
+  if (!allowedFormats.includes(format)) {
+    throw new ErrorHandler(
+      "Invalid export format. Allowed formats are: json, markdown.",
+      400,
+    );
+  }
+
+  const conversation = await Conversation.findOne({
+    _id: cid,
+    user: uid,
+  }).lean();
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation Not found.", 404);
+  }
+
+  const messages = await messageModel
+    .find({
+      conversation: cid,
+      user: uid,
+      $or: [{ status: { $ne: "pending" } }, { content: { $ne: "" } }],
+    })
+    .select("-__v")
+    .sort({ createdAt: 1 })
+    .lean();
+
+  // ! JSON Export
+  if (format === "json") {
+    return {
+      format: "json",
+      fileName: `conversation-${cid}.json`,
+      contentType: "application/json",
+      data: {
+        conversation: {
+          id: conversation._id,
+          title: conversation.title || "Untitled Conversation",
+          createdAt: conversation.createdAt,
+          updatedAt: conversation.updatedAt,
+        },
+        messages: messages.map((msg) => ({
+          id: msg._id,
+          role: msg.role,
+          content: msg.content,
+          status: msg.status,
+          provider: msg.provider,
+          model: msg.model,
+          tokensUsed: msg.tokensUsed,
+          errorMessage: msg.errorMessage,
+          createdAt: msg.createdAt,
+          updatedAt: msg.updatedAt,
+        })),
+      },
+    };
+  }
+
+  // ! Markdown Export
+  if (format === "markdown") {
+    const markdownContent = `
+# ${conversation.title || "Untitled Conversation"}
+
+**Conversation ID:** ${conversation._id}  
+**Created At:** ${conversation.createdAt}  
+**Updated At:** ${conversation.updatedAt}  
+
+---
+
+${messages
+  .map((msg) => {
+    const role =
+      msg.role === "user"
+        ? "User"
+        : msg.role === "assistant"
+          ? "Assistant"
+          : msg.role || "Unknown";
+
+    return `## ${role}
+
+${msg.content || ""}
+
+**Created At:** ${msg.createdAt}
+
+---`;
+  })
+  .join("\n\n")}
+`;
+
+    const safeTitle =
+      (conversation.title || "conversation")
+        .replace(/[^a-z0-9]/gi, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase()
+        .slice(0, 50) || "conversation";
+
+    return {
+      format: "markdown",
+      fileName: `${safeTitle}-${cid}.md`,
+      contentType: "text/markdown",
+      data: markdownContent.trim(),
+    };
+  }
+};

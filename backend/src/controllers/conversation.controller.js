@@ -4,6 +4,7 @@ import {
   archiveConversationService,
   createConversationService,
   deleteConversationService,
+  exportConversationService,
   getSingleConversationService,
   getUserConversationService,
   searchConversationService,
@@ -146,7 +147,7 @@ export const archiveConversationController = catchAsyncError(
 );
 
 // ! Search Conversation Controller -------------------->>>>>>>>>>>>>>>>>>>>>>>>........................
-// ! Search Conversations Controller
+
 export const searchConversationController = catchAsyncError(
   async (req, res, next) => {
     const uid = req.user?._id || req.user?.id;
@@ -162,6 +163,37 @@ export const searchConversationController = catchAsyncError(
       message: "Conversations fetched successfully.",
       count: conversations.length,
       conversations,
+    });
+  },
+);
+
+// ! Export Conversation Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>.......................
+export const exportConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.user?.id || req.user?._id;
+    const cid = req.params?.id;
+    const format = req.query?.format || "json";
+
+    const exportedChats = await exportConversationService({
+      uid,
+      cid,
+      format,
+    });
+
+    if (format === "markdown") {
+      res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${exportedChats.fileName || "conversation.md"}"`,
+      );
+
+      return res.status(200).send(exportedChats.data);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Conversation has been exported successfully.",
+      exportedChats,
     });
   },
 );

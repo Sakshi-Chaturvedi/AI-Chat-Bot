@@ -3,6 +3,7 @@ import {
   archiveConversationController,
   createConversation,
   deleteConversationController,
+  exportConversationController,
   getSingleConversationController,
   getUserConversationController,
   searchConversationController,
@@ -35,6 +36,8 @@ router.get("/conversations", authMiddleWare, getUserConversationController);
 
 router.get("/searchConversation", authMiddleWare, searchConversationController);
 
+router.get("/:id/export", authMiddleWare, exportConversationController);
+
 router.get(
   "/conversation/:id",
   authMiddleWare,
@@ -65,7 +68,5 @@ router.patch(
   authMiddleWare,
   archiveConversationController,
 );
-
-
 
 export default router;
