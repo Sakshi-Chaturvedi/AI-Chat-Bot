@@ -5,6 +5,7 @@ import {
   createConversationService,
   deleteConversationService,
   exportConversationService,
+  getAllSharedConversationService,
   getSingleConversationService,
   getUserConversationService,
   searchConversationService,
@@ -216,6 +217,23 @@ export const shareConversationController = catchAsyncError(
         isShared: true,
         sharedAt: "2026-05-12T...",
       },
+    });
+  },
+);
+
+// ! Get All Shared Conversation Controller --------------------->>>>>>>>>>>>>>>>>>>>>>>>>.......................
+export const getSharedConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const sharedId = req.params?.id;
+
+    const sharedConversation = await getSharedConversationService({
+      sharedId,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Shared conversation fetched successfully.",
+      sharedConversation,
     });
   },
 );

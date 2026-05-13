@@ -3,7 +3,7 @@ import { ErrorHandler } from "../middlewares/error.middleware.js";
 import Conversation from "../models/conversation.model.js";
 import User from "../models/user.model.js";
 import messageModel from "../models/message.model.js";
-import crypto from "crypto"
+import crypto from "crypto";
 
 // ! Create Conversation Service -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>..............................
 export const createConversationService = async (userData = {}) => {
@@ -368,7 +368,6 @@ ${msg.content || ""}
   }
 };
 
-
 // ! Share Conversation Service ------------------->>>>>>>>>>>>>>>>>>>>>>>>>
 export const shareConversationService = async ({ uid, cid }) => {
   if (!uid) {
@@ -412,5 +411,59 @@ export const shareConversationService = async ({ uid, cid }) => {
     shareId: conversation.shareId,
     isShared: conversation.isShared,
     sharedAt: conversation.sharedAt,
+  };
+};
+
+// ! Get All Shared Conversation Service -------------------->>>>>>>>>>>>>>>>>>>>>>>
+export const getAllSharedConversationService = async ({ sharedId }) => {
+  if (!sharedId) {
+    throw new ErrorHandler(
+      "Shared Id is required for fetching the conversation.",
+      400,
+    );
+  }
+
+  const sharedConversation = await Conversation.findOne({
+    shareId: sharedId,
+    isShared: true,
+  }).select("title shareId sharedAt shareExpiresAt shareViewCount createdAt");
+
+  if (!sharedConversation) {
+    throw new ErrorHandler("Shared conversation not found.", 404);
+  }
+
+  if (
+    sharedConversation.shareExpiresAt &&
+    sharedConversation.shareExpiresAt < new Date()
+  ) {
+    throw new ErrorHandler("Shared Conversation Link has been expired.", 410);
+  }
+
+  const messages = await messageModel
+    .find({
+      conversation: sharedConversation._id,
+    })
+    .sort({ createdAt: 1 })
+    .select("role content createdAt");
+
+  await Conversation.updateOne(
+    { _id: sharedConversation._id },
+    { $inc: { shareViewCount: 1 } },
+  );
+
+  return {
+    conversation: {
+      id: sharedConversation._id,
+      title: sharedConversation.title || "Untitled Conversation",
+      sharedAt: sharedConversation.sharedAt,
+      createdAt: sharedConversation.createdAt,
+    },
+
+    messages: messages.map((msg) => ({
+      id: msg._id,
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.createdAt,
+    })),
   };
 };

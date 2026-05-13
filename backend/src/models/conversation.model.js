@@ -36,10 +36,21 @@ const conversationSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
       index: true,
+      trim: true,
     },
 
     sharedAt: {
       type: Date,
+    },
+
+    shareExpiresAt: {
+      type: Date,
+    },
+
+    shareViewCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     lastMessageAt: {
