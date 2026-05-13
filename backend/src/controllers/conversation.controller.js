@@ -11,6 +11,7 @@ import {
   searchConversationService,
   shareConversationService,
   togglePinConversationService,
+  unshareConversationService,
   updateConversationService,
 } from "../services/conversation.service.js";
 
@@ -226,7 +227,7 @@ export const getSharedConversationController = catchAsyncError(
   async (req, res, next) => {
     const sharedId = req.params?.id;
 
-    const sharedConversation = await getSharedConversationService({
+    const sharedConversation = await getAllSharedConversationService({
       sharedId,
     });
 
@@ -234,6 +235,22 @@ export const getSharedConversationController = catchAsyncError(
       success: true,
       message: "Shared conversation fetched successfully.",
       sharedConversation,
+    });
+  },
+);
+
+// ! UnShare Conversation Controller -------------------->>>>>>>>>>>>>>>>>>>>>>>>.......................
+export const unshareConversationController = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.user?.id || req.user?._id;
+    const cid = req.params?.id;
+
+    const unShareConversation = await unshareConversationService({ uid, cid });
+
+    res.status(200).json({
+      success: true,
+      message: "Conversation has been unshared.",
+      unShareConversation,
     });
   },
 );

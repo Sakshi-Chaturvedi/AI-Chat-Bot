@@ -4,11 +4,13 @@ import {
   createConversation,
   deleteConversationController,
   exportConversationController,
+  getSharedConversationController,
   getSingleConversationController,
   getUserConversationController,
   searchConversationController,
   shareConversationController,
   togglePinConversationController,
+  unshareConversationController,
   updateConversationController,
 } from "../controllers/conversation.controller.js";
 
@@ -39,7 +41,11 @@ router.get("/searchConversation", authMiddleWare, searchConversationController);
 
 router.get("/:id/export", authMiddleWare, exportConversationController);
 
-router.post("/:id/share", authMiddleWare, shareConversationController);
+router.patch("/:id/share", authMiddleWare, shareConversationController);
+
+router.patch("/:id/unshare", authMiddleWare, unshareConversationController);
+
+router.get("/shared/:id", getSharedConversationController);
 
 router.get(
   "/conversation/:id",

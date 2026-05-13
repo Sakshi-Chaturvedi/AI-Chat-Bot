@@ -400,6 +400,7 @@ export const shareConversationService = async ({ uid, cid }) => {
   }
 
   const shareId = crypto.randomBytes(24).toString("hex");
+  conversation.shareExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   conversation.isShared = true;
   conversation.shareId = shareId;
@@ -427,6 +428,8 @@ export const getAllSharedConversationService = async ({ sharedId }) => {
     shareId: sharedId,
     isShared: true,
   }).select("title shareId sharedAt shareExpiresAt shareViewCount createdAt");
+
+  console.log("Shared Conversation", sharedConversation);
 
   if (!sharedConversation) {
     throw new ErrorHandler("Shared conversation not found.", 404);
@@ -465,5 +468,52 @@ export const getAllSharedConversationService = async ({ sharedId }) => {
       content: msg.content,
       createdAt: msg.createdAt,
     })),
+  };
+};
+
+// ! Unshare Conversation Service ----------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const unshareConversationService = async ({ uid, cid }) => {
+  if (!uid) {
+    throw new ErrorHandler("User ID is required.", 400);
+  }
+
+  if (!cid) {
+    throw new ErrorHandler("Conversation ID is required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(cid)) {
+    throw new ErrorHandler("Invalid Conversation ID.", 400);
+  }
+
+  const conversation = await Conversation.findOne({
+    _id: cid,
+    user: uid,
+  });
+
+  if (!conversation) {
+    throw new ErrorHandler("Conversation not found.", 404);
+  }
+
+  if (!conversation.isShared) {
+    return {
+      id: conversation._id,
+      title: conversation.title,
+      isShared: conversation.isShared,
+      message: "Conversation is already unshared.",
+    };
+  }
+
+  conversation.isShared = false;
+  conversation.sharedAt = undefined;
+  conversation.shareId = undefined;
+  conversation.shareExpiresAt = undefined;
+
+  await conversation.save({ validateBeforeSave: false });
+
+  return {
+    id: conversation._id,
+    title: conversation.title,
+    isShared: conversation.isShared,
+    message: "Conversation has been unshared successfully.",
   };
 };
