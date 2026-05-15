@@ -183,16 +183,22 @@ export const exportConversationController = catchAsyncError(
       format,
     });
 
+    // ! Markdown Download Response
     if (format === "markdown") {
-      res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+      res.setHeader(
+        "Content-Type",
+        exportedChats.contentType || "text/markdown; charset=utf-8",
+      );
+
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${exportedChats.fileName || "conversation.md"}"`,
       );
 
-      return res.status(200).send(exportedChats.data);
+      return res.status(200).send(exportedChats.content);
     }
 
+    // ! JSON Response
     return res.status(200).json({
       success: true,
       message: "Conversation has been exported successfully.",

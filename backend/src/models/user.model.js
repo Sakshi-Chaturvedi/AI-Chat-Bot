@@ -57,12 +57,27 @@ const userSchema = new mongoose.Schema(
         default: Date.now,
       },
     },
+
     plan: {
       type: String,
-      enum: ["free", "pro"],
+      enum: ["free", "pro", "premium"],
       default: "free",
     },
-    
+
+    subscriptionStatus: {
+      type: String,
+      enum: ["active", "inactive", "cancelled", "expired"],
+      default: "active",
+    },
+
+    subscriptionStartedAt: {
+      type: Date,
+    },
+
+    subscriptionExpiresAt: {
+      type: Date,
+    },
+
     // ? Auth
     refreshToken: String,
 
@@ -114,16 +129,20 @@ userSchema.methods.comparePassword = async function (enteredPass) {
 };
 
 // ! Reset password token
-userSchema.methods.generateResetPasswordToken = function () {
-  const resetToken = crypto.randomBytes(20).toString("hex");
+userSchema.methods.getResetPasswordToken = function () {
+  // raw token generate
+  const resetToken = crypto.randomBytes(32).toString("hex");
 
+  // hashed token DB me save karo
   this.resetPasswordToken = crypto
     .createHash("sha256")
     .update(resetToken)
     .digest("hex");
 
-  this.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
+  // 10 minutes expiry
+  this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
 
+  // raw token return karo, ye URL/Postman me use hoga
   return resetToken;
 };
 

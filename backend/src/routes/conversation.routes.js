@@ -53,7 +53,7 @@ router.get(
   getSingleConversationController,
 );
 
-router.put(
+router.patch(
   "/updateTitle/:id",
   authMiddleWare,
   validate(updateConversationValidation),
@@ -73,7 +73,7 @@ router.patch(
 );
 
 router.patch(
-  "/archieveconversation/:id",
+  "/archiveconversation/:id",
   authMiddleWare,
   archiveConversationController,
 );

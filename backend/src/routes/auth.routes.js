@@ -12,7 +12,6 @@ import {
   userVerification,
 } from "../controllers/auth.controller.js";
 import authMiddleware from "../middlewares/auth.middleware.js";
-import authLimiter from "../middlewares/authLimiter.middleware.js";
 import validate from "../middlewares/validate.middleware.js";
 import {
   changePasswordSchema,
@@ -24,6 +23,7 @@ import {
   updateProfileSchema,
 } from "../validations/auth.validation.js";
 import upload from "../middlewares/upload.middleware.js";
+import { authLimiter, loginLimiter, otpLimiter } from "../middlewares/authLimiter.middleware.js";
 
 const router = express.Router();
 
@@ -38,9 +38,9 @@ router.post(
   registerController,
 );
 
-router.get("/verify", authLimiter, userVerification);
+router.get("/verify", otpLimiter, userVerification);
 
-router.post("/login", authLimiter, validate(loginSchema), loginController);
+router.post("/login", loginLimiter, validate(loginSchema), loginController);
 
 router.get("/profile", authMiddleware, userProfileController);
 

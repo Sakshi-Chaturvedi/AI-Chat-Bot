@@ -7,7 +7,8 @@ import router from "./routes/auth.routes.js";
 import conversationRouter from "./routes/conversation.routes.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import messageRouter from "./routes/message.route.js";
-import apiLimiter from "./middlewares/rateLimit.middleware.js"
+import apiLimiter from "./middlewares/rateLimit.middleware.js";
+import usageRoutes from "./routes/usage.routes.js";
 
 const app = express();
 
@@ -63,6 +64,9 @@ app.use("/api/v1/conversation", conversationRouter);
 
 // ! Message Routes
 app.use("/api/v1/message", messageRouter);
+
+// ! Usage Routes
+app.use("/api/v1/usage", usageRoutes);
 
 // ❗ 404 Handler (route not found)
 app.use((req, res, next) => {

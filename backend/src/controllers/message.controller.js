@@ -17,12 +17,14 @@ export const createMessageController = catchAsyncError(
   async (req, res, next) => {
     const user = req.user?.id || req.user?._id;
     const conversationId = req.params.id;
-    const { content } = req.body;
+    const { content, requestedModel } = req.body;
+
 
     const message = await createMessageService({
       user,
       conversationId,
       content,
+      requestedModel
     });
 
     res.status(201).json({
@@ -138,7 +140,7 @@ export const cancelReplyGenerationController = catchAsyncError(
 export const streamMessageController = async (req, res) => {
   const userId = req.user?.id || req.user?._id;
   const conversationId = req.params.id;
-  
+
   const { content } = req.body;
 
   res.setHeader("Content-Type", "text/event-stream");

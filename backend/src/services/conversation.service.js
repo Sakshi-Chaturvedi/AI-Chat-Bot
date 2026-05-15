@@ -4,6 +4,8 @@ import Conversation from "../models/conversation.model.js";
 import User from "../models/user.model.js";
 import messageModel from "../models/message.model.js";
 import crypto from "crypto";
+import { PLAN_ACTIONS } from "../constants/planActions.js";
+import { checkPlanLimit } from "./plan.service.js";
 
 // ! Create Conversation Service -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>..............................
 export const createConversationService = async (userData = {}) => {
@@ -249,8 +251,14 @@ export const searchConversationService = async (searchData = {}) => {
 };
 
 // ! Export Conversation Service --------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-export const exportConversationService = async ({ uid, cid, format }) => {
-  if (!uid) throw new ErrorHandler("User Id is Required.", 400);
+export const exportConversationService = async ({
+  uid,
+  cid,
+  format = "json",
+}) => {
+  if (!uid) {
+    throw new ErrorHandler("User Id is Required.", 400);
+  }
 
   if (!cid) {
     throw new ErrorHandler(
@@ -272,6 +280,11 @@ export const exportConversationService = async ({ uid, cid, format }) => {
     );
   }
 
+  await checkPlanLimit({
+    userId: uid,
+    action: PLAN_ACTIONS.EXPORT_CONVERSATION,
+  });
+
   const conversation = await Conversation.findOne({
     _id: cid,
     user: uid,
@@ -290,6 +303,12 @@ export const exportConversationService = async ({ uid, cid, format }) => {
     .select("-__v")
     .sort({ createdAt: 1 })
     .lean();
+
+  // Usage increment should happen for both JSON and Markdown export
+  await incrementUsage({
+    userId: uid,
+    exports: 1,
+  });
 
   // ! JSON Export
   if (format === "json") {
@@ -363,7 +382,7 @@ ${msg.content || ""}
       format: "markdown",
       fileName: `${safeTitle}-${cid}.md`,
       contentType: "text/markdown",
-      data: markdownContent.trim(),
+      content: markdownContent.trim(),
     };
   }
 };
@@ -381,6 +400,11 @@ export const shareConversationService = async ({ uid, cid }) => {
   if (!mongoose.Types.ObjectId.isValid(cid)) {
     throw new ErrorHandler("Invalid conversation id.", 400);
   }
+
+  await checkPlanLimit({
+    userId: uid,
+    action: PLAN_ACTIONS.SHARE_CONVERSATION,
+  });
 
   const conversation = await Conversation.findOne({
     _id: cid,

@@ -139,7 +139,7 @@ export const forgotPasswordService = async (userData = {}) => {
     throw new ErrorHandler("User not found.", 404);
   }
 
-  const resetToken = user.generateResetPasswordToken();
+  const resetToken = user.getResetPasswordToken();
 
   await user.save({ validateBeforeSave: false });
 
@@ -159,10 +159,25 @@ export const resetPasswordService = async (userData = {}) => {
     throw new ErrorHandler("New password is required.", 400);
   }
 
+  if (!confirmPassword) {
+    throw new ErrorHandler("Confirm password is required.", 400);
+  }
+
+  if (password !== confirmPassword) {
+    throw new ErrorHandler(
+      "Password and confirm password should be same.",
+      400,
+    );
+  }
+
   const resetPasswordToken = crypto
     .createHash("sha256")
     .update(token)
     .digest("hex");
+
+  // const resetPasswordToken = token;
+  console.log(token);
+  console.log(resetPasswordToken);
 
   const user = await userModel
     .findOne({
@@ -178,8 +193,8 @@ export const resetPasswordService = async (userData = {}) => {
     );
   }
 
-  if (password != confirmPassword)
-    throw new ErrorHandler("Confirm Password Should be Equal to Password.");
+  // if (password != confirmPassword)
+  //   throw new ErrorHandler("Confirm Password Should be Equal to Password.");
 
   user.password = password;
   user.resetPasswordToken = undefined;
@@ -187,7 +202,13 @@ export const resetPasswordService = async (userData = {}) => {
 
   await user.save();
 
-  return user;
+  user.password = undefined;
+
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+  };
 };
 
 // ! Resend Verification Email Service

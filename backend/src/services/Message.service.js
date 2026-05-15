@@ -3,12 +3,17 @@ import Conversation from "../models/conversation.model.js";
 import messageModel from "../models/message.model.js";
 import mongoose from "mongoose";
 import userModel from "../models/user.model.js";
-import { MESSAGE_LIMITS } from "../constants/limits.js";
-// import { generateAIResponse } from "./ai.service.js";
-// import { generateAIStream } from "../utils/generateAIStream.js";
+// import { MESSAGE_LIMITS } from "../constants/limits.js";
 import { generateAIResponse } from "../ai/ai.service.js";
 import { generateOpenRouterStream } from "../ai/providers/openrouter-stream.provider.js";
-import {readOpenRouterStream} from "../utils/readOpenRouterStream.js"
+import { readOpenRouterStream } from "../utils/readOpenRouterStream.js";
+import { checkPlanLimit } from "./plan.service.js";
+import { estimateTokens } from "../utils/estimateTokens.js";
+import { incrementUsage } from "./usage.service.js";
+import { PLAN_ACTIONS } from "../constants/planActions.js";
+import { resolveModelForUser } from "../utils/resolveModelForUser.js";
+import { PLAN_LIMITS } from "../constants/limits.js";
+
 // ! Title Generator Function ----------------->>>>>>>>>>>>>>>>>>>>>>>>>>.............................
 const generateTitleFromMessage = (content = "") => {
   const cleanText = content.trim().replace(/\s+/g, " ");
@@ -23,6 +28,7 @@ export const createMessageService = async (userMessage = {}) => {
   const conversationId = userMessage.conversationId;
   const userId = userMessage.user;
   const content = userMessage.content?.trim();
+  const requestedModel = userMessage.requestedModel || "basic";
 
   if (!conversationId || !userId || !content) {
     throw new ErrorHandler(
@@ -31,39 +37,50 @@ export const createMessageService = async (userMessage = {}) => {
     );
   }
 
-  
-  
-  const user = await userModel.findById(userId);
+  const estimatedInputTokens = estimateTokens(content);
 
+  const planCheck = await checkPlanLimit({
+    userId,
+    action: PLAN_ACTIONS.SEND_MESSAGE,
+    requestedModel,
+    estimatedTokens: estimatedInputTokens,
+  });
+
+  const { selectedModel, modelConfig } = resolveModelForUser({
+    requestedModel,
+    limits: planCheck.limits,
+  });
+
+  const user = await userModel.findById(userId);
 
   if (!user) throw new ErrorHandler("User not found.", 400);
 
-  if (!user.usage) {
-    user.usage = {
-      dailyMessages: 0,
-      lastResetDate: new Date(),
-    };
-  }
+  // const estimatedInputTokens = estimateTokens(content);
 
-  const today = new Date().toDateString();
-  const lastResetDate = new Date(user.usage.lastResetDate).toDateString();
+  // if (!user.usage) {
+  //   user.usage = {
+  //     dailyMessages: 0,
+  //     lastResetDate: new Date(),
+  //   };
+  // }
 
-  if (today !== lastResetDate) {
-    user.usage.dailyMessages = 0;
-    user.usage.lastResetDate = new Date();
-    await user.save({ validateBeforeSave: false });
-  }
-  const userPlan = user.plan || "free";
-  const dailyLimit = MESSAGE_LIMITS[userPlan] || MESSAGE_LIMITS.free;
+  // const today = new Date().toDateString();
+  // const lastResetDate = new Date(user.usage.lastResetDate).toDateString();
 
-  
+  // if (today !== lastResetDate) {
+  //   user.usage.dailyMessages = 0;
+  //   user.usage.lastResetDate = new Date();
+  //   await user.save({ validateBeforeSave: false });
+  // }
+  // const userPlan = user.plan || "free";
+  // const dailyLimit = MESSAGE_LIMITS[userPlan] || MESSAGE_LIMITS.free;
 
-  if (user.usage.dailyMessages >= dailyLimit) {
-    throw new ErrorHandler(
-      `Daily message limit reached. Your ${userPlan} plan allows ${dailyLimit} messages per day.`,
-      429,
-    );
-  }
+  // if (user.usage.dailyMessages >= dailyLimit) {
+  //   throw new ErrorHandler(
+  //     `Daily message limit reached. Your ${userPlan} plan allows ${dailyLimit} messages per day.`,
+  //     429,
+  //   );
+  // }
 
   const conversation = await Conversation.findOne({
     _id: conversationId,
@@ -79,7 +96,7 @@ export const createMessageService = async (userMessage = {}) => {
     user: userId,
   });
 
-  console.log(existingMessages);
+  // console.log(existingMessages);
 
   // ? Save user message
   const message = await messageModel.create({
@@ -126,6 +143,7 @@ export const createMessageService = async (userMessage = {}) => {
     const aiResponse = await generateAIResponse({
       prompt: content,
       history: conversationHistory,
+      requestedModel,
     });
 
     assistantMessage.content = aiResponse.response;
@@ -136,6 +154,12 @@ export const createMessageService = async (userMessage = {}) => {
 
     conversation.lastMessageAt = new Date();
     await conversation.save();
+
+    await incrementUsage({
+      userId,
+      messages: 1,
+      tokens: aiResponse.tokensUsed || estimatedInputTokens,
+    });
 
     return { message, assistantMessage };
   } catch (error) {
@@ -666,7 +690,7 @@ export const streamMessageService = async ({
   }
 
   const userPlan = user.plan || "free";
-  const dailyLimit = MESSAGE_LIMITS[userPlan] || MESSAGE_LIMITS.free;
+  const dailyLimit = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
 
   if (user.usage.dailyMessages >= dailyLimit) {
     throw new ErrorHandler(
@@ -737,15 +761,15 @@ export const streamMessageService = async ({
     });
 
     for await (const chunkText of readOpenRouterStream(stream)) {
-  if (!chunkText) continue;
+      if (!chunkText) continue;
 
-  fullResponse += chunkText;
+      fullResponse += chunkText;
 
-  sendEvent("chunk", {
-    assistantMessageId: assistantMessage._id,
-    text: chunkText,
-  });
-}
+      sendEvent("chunk", {
+        assistantMessageId: assistantMessage._id,
+        text: chunkText,
+      });
+    }
 
     const latestAssistantMessage = await messageModel.findById(
       assistantMessage._id,

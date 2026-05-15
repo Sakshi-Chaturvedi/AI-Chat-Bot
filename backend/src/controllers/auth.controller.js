@@ -235,6 +235,8 @@ export const forgotPasswordController = catchAsyncError(
 export const resetPassWordController = catchAsyncError(
   async (req, res, next) => {
     const { token } = req.params;
+    console.log(token);
+    
     const { password, confirmPassword } = req.body;
 
     const resetPassword = await resetPasswordService({
