@@ -9,6 +9,7 @@ import { errorMiddleware } from "./middlewares/error.middleware.js";
 import messageRouter from "./routes/message.route.js";
 import apiLimiter from "./middlewares/rateLimit.middleware.js";
 import usageRoutes from "./routes/usage.routes.js";
+import adminRouter from "./routes/admin.routes.js";
 
 const app = express();
 
@@ -67,6 +68,9 @@ app.use("/api/v1/message", messageRouter);
 
 // ! Usage Routes
 app.use("/api/v1/usage", usageRoutes);
+
+// ! Admin Routes
+app.use("/api/v1/admin", adminRouter);
 
 // ❗ 404 Handler (route not found)
 app.use((req, res, next) => {
