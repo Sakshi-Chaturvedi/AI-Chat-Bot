@@ -39,6 +39,7 @@ export const createMessageService = async (userMessage = {}) => {
 
   const estimatedInputTokens = estimateTokens(content);
 
+  // 1. Check plan limits and requested model access
   const planCheck = await checkPlanLimit({
     userId,
     action: PLAN_ACTIONS.SEND_MESSAGE,
@@ -51,37 +52,22 @@ export const createMessageService = async (userMessage = {}) => {
     limits: planCheck.limits,
   });
 
+  // 2. Find user
   const user = await userModel.findById(userId);
 
-  if (!user) throw new ErrorHandler("User not found.", 400);
+  if (!user) {
+    throw new ErrorHandler("User not found.", 404);
+  }
 
-  // const estimatedInputTokens = estimateTokens(content);
+  // 3. Safely initialize daily usage if missing
+  if (!user.usage) {
+    user.usage = {
+      dailyMessages: 0,
+      lastResetDate: new Date(),
+    };
+  }
 
-  // if (!user.usage) {
-  //   user.usage = {
-  //     dailyMessages: 0,
-  //     lastResetDate: new Date(),
-  //   };
-  // }
-
-  // const today = new Date().toDateString();
-  // const lastResetDate = new Date(user.usage.lastResetDate).toDateString();
-
-  // if (today !== lastResetDate) {
-  //   user.usage.dailyMessages = 0;
-  //   user.usage.lastResetDate = new Date();
-  //   await user.save({ validateBeforeSave: false });
-  // }
-  // const userPlan = user.plan || "free";
-  // const dailyLimit = MESSAGE_LIMITS[userPlan] || MESSAGE_LIMITS.free;
-
-  // if (user.usage.dailyMessages >= dailyLimit) {
-  //   throw new ErrorHandler(
-  //     `Daily message limit reached. Your ${userPlan} plan allows ${dailyLimit} messages per day.`,
-  //     429,
-  //   );
-  // }
-
+  // 4. Find conversation and verify ownership
   const conversation = await Conversation.findOne({
     _id: conversationId,
     user: userId,
@@ -96,77 +82,112 @@ export const createMessageService = async (userMessage = {}) => {
     user: userId,
   });
 
-  // console.log(existingMessages);
-
-  // ? Save user message
+  // 5. Save user message
   const message = await messageModel.create({
     conversation: conversationId,
     user: userId,
     role: "user",
     content,
     status: "completed",
+    selectedModel,
   });
 
+  // 6. Increment daily usage
   user.usage.dailyMessages += 1;
+  user.usage.lastResetDate = user.usage.lastResetDate || new Date();
+
   await user.save({ validateBeforeSave: false });
 
-  // ? Fetch recent conversation history for AI context
+  // 7. Fetch previous conversation history only
+  // Important: current user message ko history me include mat karo,
+  // warna AI ko same prompt duplicate mil sakta hai.
   const recentMessages = await messageModel
     .find({
       conversation: conversationId,
       user: userId,
       status: "completed",
+      createdAt: { $lt: message.createdAt },
     })
     .sort({ createdAt: -1 })
     .limit(20)
     .select("role content")
     .lean();
 
-  const conversationHistory = recentMessages.reverse();
+  const conversationHistory = recentMessages
+    .reverse()
+    .filter((msg) => msg.content?.trim())
+    .map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
 
-  // ? Generate Conversation title if it's new conversation
+  // 8. Generate conversation title if first message
   if (existingMessages === 0 && conversation.title === "New Chat") {
     conversation.title = generateTitleFromMessage(content);
   }
 
-  // ? Create assistant pending message
-  let assistantMessage = await messageModel.create({
+  // 9. Create assistant pending message
+  const assistantMessage = await messageModel.create({
     conversation: conversationId,
     user: userId,
     role: "assistant",
     content: "",
     status: "pending",
+    selectedModel,
+    provider: modelConfig.provider,
+    model: modelConfig.model,
+    tokensUsed: 0,
   });
 
-  // ? Failure Handling in the Chatbot
   try {
+    // 10. Generate AI response using resolved provider/model
     const aiResponse = await generateAIResponse({
       prompt: content,
       history: conversationHistory,
-      requestedModel,
+      provider: modelConfig.provider,
+      model: modelConfig.model,
     });
 
+    if (!aiResponse?.response) {
+      throw new ErrorHandler("Empty AI response received.", 500);
+    }
+
+    // 11. Update assistant message
     assistantMessage.content = aiResponse.response;
     assistantMessage.status = "completed";
-    assistantMessage.model = aiResponse.model;
-    assistantMessage.tokensUsed = aiResponse.tokensUsed;
+    assistantMessage.selectedModel = selectedModel;
+    assistantMessage.provider = aiResponse.provider || modelConfig.provider;
+    assistantMessage.model = aiResponse.model || modelConfig.model;
+    assistantMessage.tokensUsed = aiResponse.tokensUsed || 0;
+    assistantMessage.errorMessage = null;
+
     await assistantMessage.save();
 
+    // 12. Update conversation
     conversation.lastMessageAt = new Date();
     await conversation.save();
 
+    // 13. Increment monthly usage
     await incrementUsage({
       userId,
       messages: 1,
       tokens: aiResponse.tokensUsed || estimatedInputTokens,
     });
 
-    return { message, assistantMessage };
+    return {
+      message,
+      assistantMessage,
+    };
   } catch (error) {
     assistantMessage.content =
       "Sorry, I couldn't generate a response. Please try again.";
     assistantMessage.status = "failed";
-    assistantMessage.errorMessage = error.message;
+    assistantMessage.errorMessage =
+      error.message || "AI response generation failed.";
+    assistantMessage.selectedModel = selectedModel;
+    assistantMessage.provider = modelConfig.provider;
+    assistantMessage.model = modelConfig.model;
+
     await assistantMessage.save();
 
     conversation.lastMessageAt = new Date();

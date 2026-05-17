@@ -40,6 +40,10 @@ export const generateAIResponse = async ({
   }
 
   try {
+    // temporary debug logs; later replace with logger or remove
+    console.log("AI_PROVIDER:", provider);
+    console.log("Using model:", model || process.env.OPENROUTER_DEFAULT_MODEL);
+
     if (provider === "openrouter") {
       return await generateOpenRouterResponse({
         prompt,
@@ -53,12 +57,10 @@ export const generateAIResponse = async ({
       return await generateGeminiResponse({
         prompt,
         history,
+        model,
         systemInstruction,
       });
     }
-
-    console.log("AI_PROVIDER:", provider);
-    console.log("Using model:", model || process.env.OPENROUTER_DEFAULT_MODEL);
 
     throw new ErrorHandler("Invalid AI provider selected.", 400);
   } catch (error) {
@@ -71,6 +73,7 @@ export const generateAIResponse = async ({
         return await generateGeminiResponse({
           prompt,
           history,
+          model: process.env.GEMINI_MODEL || "gemini-2.0-flash",
           systemInstruction,
         });
       } catch (fallbackError) {

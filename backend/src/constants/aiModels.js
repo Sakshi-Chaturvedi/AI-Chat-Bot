@@ -6,17 +6,22 @@ export const AI_MODELS = {
 
 export const MODEL_CONFIG = {
   basic: {
-    provider: "openai",
-    model: "gpt-4o-mini",
+    provider: "openrouter",
+    model: "openrouter/free",
+    label: "Basic",
   },
 
   standard: {
-    provider: "openai",
-    model: "gpt-4.1-mini",
+    provider: "openrouter",
+    model: "openrouter/free", 
+    label: "Standard",
+    // TODO: Replace with cheaper paid model for Pro users
   },
 
   advanced: {
-    provider: "openai",
-    model: "gpt-4.1",
+    provider: "openrouter",
+    model: "openrouter/free",
+    label: "Advanced",
+    // TODO: Replace with premium model for Premium users
   },
 };

@@ -24,19 +24,19 @@ router.get("/check", (req, res) => {
 });
 
 router.post(
-  "/:id",
-  authMiddleWare,
-  messageLimiter,
-  validate(createMessageValidation),
-  createMessageController,
-);
-
-router.post(
   "/stream/:id",
   authMiddleWare,
   messageLimiter,
   validate(createMessageValidation),
   streamMessageController,
+);
+
+router.post(
+  "/:id",
+  authMiddleWare,
+  messageLimiter,
+  validate(createMessageValidation),
+  createMessageController,
 );
 
 router.get("/searchMessage/:id", authMiddleWare, searchMessagecontroller);
@@ -51,7 +51,7 @@ router.patch(
 router.get("/:id", authMiddleWare, getMessageController);
 
 router.patch(
-  "cancel-message/:id",
+  "/cancel-message/:id",
   authMiddleWare,
   cancelReplyGenerationController,
 );
@@ -63,7 +63,7 @@ router.patch(
   editMessageController,
 );
 
-router.post(
+router.patch(
   "/retry/:id",
   authMiddleWare,
   messageLimiter,

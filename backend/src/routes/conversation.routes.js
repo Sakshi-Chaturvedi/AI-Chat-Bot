@@ -28,6 +28,12 @@ router.get("/check", (req, res) => {
   res.send("Conversation route is working successfully.");
 });
 
+router.get("/shared/:id", getSharedConversationController);
+
+router.get("/conversations", authMiddleWare, getUserConversationController);
+
+router.get("/searchConversation", authMiddleWare, searchConversationController);
+
 router.post(
   "/",
   authMiddleWare,
@@ -35,17 +41,11 @@ router.post(
   createConversation,
 );
 
-router.get("/conversations", authMiddleWare, getUserConversationController);
-
-router.get("/searchConversation", authMiddleWare, searchConversationController);
-
 router.get("/:id/export", authMiddleWare, exportConversationController);
 
 router.patch("/:id/share", authMiddleWare, shareConversationController);
 
 router.patch("/:id/unshare", authMiddleWare, unshareConversationController);
-
-router.get("/shared/:id", getSharedConversationController);
 
 router.get(
   "/conversation/:id",
