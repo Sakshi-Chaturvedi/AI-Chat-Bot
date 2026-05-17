@@ -19,12 +19,11 @@ export const createMessageController = catchAsyncError(
     const conversationId = req.params.id;
     const { content, requestedModel } = req.body;
 
-
     const message = await createMessageService({
       user,
       conversationId,
       content,
-      requestedModel
+      requestedModel,
     });
 
     res.status(201).json({
@@ -52,20 +51,21 @@ export const getMessageController = catchAsyncError(async (req, res, next) => {
 // ! Edit Message Controller ------------------------>>>>>>>>>>>>>>>>>>>>>...............................
 export const editMessageController = catchAsyncError(async (req, res, next) => {
   const messageId = req.params.id;
-  const userId = req.user.id;
+  const userId = req.user?.id || req.user?._id;
 
-  const { content } = req.body;
+  const { content, requestedModel } = req.body;
 
   const updatedMessage = await editMessageService({
     messageId,
     userId,
     content,
+    requestedModel,
   });
 
   res.status(200).json({
     success: true,
     message: "Message updated successfully.",
-    updatedMessage,
+    data: updatedMessage,
   });
 });
 
@@ -73,14 +73,19 @@ export const editMessageController = catchAsyncError(async (req, res, next) => {
 export const regenerateMessageController = catchAsyncError(
   async (req, res, next) => {
     const mid = req.params.id;
-    const uid = req.user.id;
+    const uid = req.user?.id || req.user?._id;
+    const { requestedModel } = req.body;
 
-    const newAnswer = await regenerateReplyService({ mid, uid });
+    const newAnswer = await regenerateReplyService({
+      mid,
+      uid,
+      requestedModel,
+    });
 
     res.status(200).json({
       success: true,
-      message: "Regenerated Reply Successfully.",
-      newAnswer,
+      message: "Regenerated reply successfully.",
+      data: newAnswer,
     });
   },
 );
@@ -109,12 +114,17 @@ export const retryFailedMessageController = catchAsyncError(
   async (req, res, next) => {
     const mid = req.params.id;
     const uid = req.user?.id || req.user?._id;
+    const { requestedModel } = req.body;
 
-    const retryMessage = await retryFailedMessageService({ mid, uid });
+    const retryMessage = await retryFailedMessageService({
+      mid,
+      uid,
+      requestedModel,
+    });
 
     res.status(200).json({
       success: true,
-      message: "Message has been regenerated successfully.",
+      message: "Failed message retried successfully.",
       data: retryMessage,
     });
   },

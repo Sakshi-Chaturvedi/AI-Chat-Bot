@@ -241,6 +241,7 @@ export const editMessageService = async (userMessage = {}) => {
   const mid = userMessage.messageId;
   const uid = userMessage.userId;
   const content = userMessage.content?.trim();
+  const requestedModel = userMessage.requestedModel || "basic";
 
   if (!mid) {
     throw new ErrorHandler("Message ID is required.", 400);
@@ -277,7 +278,23 @@ export const editMessageService = async (userMessage = {}) => {
     throw new ErrorHandler("Conversation not found or unauthorized.", 404);
   }
 
+  const estimatedInputTokens = estimateTokens(content);
+
+  const planCheck = await checkPlanLimit({
+    userId: uid,
+    action: PLAN_ACTIONS.SEND_MESSAGE,
+    requestedModel,
+    estimatedTokens: estimatedInputTokens,
+  });
+
+  const { selectedModel, modelConfig } = resolveModelForUser({
+    requestedModel,
+    limits: planCheck.limits,
+  });
+
+  // Update user message
   message.content = content;
+  message.selectedModel = selectedModel;
   await message.save();
 
   let assistantReply = await messageModel
@@ -289,52 +306,95 @@ export const editMessageService = async (userMessage = {}) => {
     })
     .sort({ createdAt: 1 });
 
-  try {
-    const updatedAiAnswer = await generateAIResponse({ prompt: content });
+  if (assistantReply) {
+    assistantReply.status = "pending";
+    assistantReply.content = "";
+    assistantReply.errorMessage = null;
+    assistantReply.selectedModel = selectedModel;
+    assistantReply.provider = modelConfig.provider;
+    assistantReply.model = modelConfig.model;
+    assistantReply.tokensUsed = 0;
+    await assistantReply.save();
+  } else {
+    assistantReply = await messageModel.create({
+      conversation: message.conversation,
+      user: uid,
+      role: "assistant",
+      content: "",
+      status: "pending",
+      selectedModel,
+      provider: modelConfig.provider,
+      model: modelConfig.model,
+      tokensUsed: 0,
+    });
+  }
 
-    if (assistantReply) {
-      assistantReply.content = updatedAiAnswer.response;
-      assistantReply.status = "completed";
-      assistantReply.model = updatedAiAnswer.model;
-      assistantReply.tokensUsed = updatedAiAnswer.tokensUsed;
-      assistantReply.errorMessage = undefined;
-      await assistantReply.save();
-    } else {
-      assistantReply = await messageModel.create({
-        conversation: message.conversation,
-        user: uid,
-        role: "assistant",
-        content: updatedAiAnswer.response,
-        status: "completed",
-        model: updatedAiAnswer.model,
-        tokensUsed: updatedAiAnswer.tokensUsed,
-      });
+  const recentMessages = await messageModel
+    .find({
+      conversation: message.conversation,
+      user: uid,
+      status: "completed",
+      createdAt: { $lt: message.createdAt },
+    })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .select("role content")
+    .lean();
+
+  const history = recentMessages
+    .reverse()
+    .filter((msg) => msg.content?.trim())
+    .map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+  try {
+    const updatedAiAnswer = await generateAIResponse({
+      prompt: content,
+      history,
+      provider: modelConfig.provider,
+      model: modelConfig.model,
+    });
+
+    if (!updatedAiAnswer?.response) {
+      throw new ErrorHandler("Empty AI response received.", 500);
     }
+
+    assistantReply.content = updatedAiAnswer.response;
+    assistantReply.status = "completed";
+    assistantReply.selectedModel = selectedModel;
+    assistantReply.provider = updatedAiAnswer.provider || modelConfig.provider;
+    assistantReply.model = updatedAiAnswer.model || modelConfig.model;
+    assistantReply.tokensUsed = updatedAiAnswer.tokensUsed || 0;
+    assistantReply.errorMessage = null;
+
+    await assistantReply.save();
 
     conversation.lastMessageAt = new Date();
     await conversation.save();
+
+    await incrementUsage({
+      userId: uid,
+      messages: 1,
+      tokens: updatedAiAnswer.tokensUsed || estimatedInputTokens,
+    });
 
     return {
       userMessage: message,
       assistantReply,
     };
   } catch (error) {
-    if (assistantReply) {
-      assistantReply.content =
-        "Sorry, I couldn't generate a response. Please try again.";
-      assistantReply.status = "failed";
-      assistantReply.errorMessage = error.message;
-      await assistantReply.save();
-    } else {
-      assistantReply = await messageModel.create({
-        conversation: message.conversation,
-        user: uid,
-        role: "assistant",
-        content: "Sorry, I couldn't generate a response. Please try again.",
-        status: "failed",
-        errorMessage: error.message,
-      });
-    }
+    assistantReply.content =
+      "Sorry, I couldn't generate a response. Please try again.";
+    assistantReply.status = "failed";
+    assistantReply.errorMessage =
+      error.message || "AI response generation failed.";
+    assistantReply.selectedModel = selectedModel;
+    assistantReply.provider = modelConfig.provider;
+    assistantReply.model = modelConfig.model;
+
+    await assistantReply.save();
 
     conversation.lastMessageAt = new Date();
     await conversation.save();
@@ -347,7 +407,7 @@ export const editMessageService = async (userMessage = {}) => {
 };
 
 // ! Regenerate Assistant reply for particular chat Service ------------>>>>>>>>>>>>>>>>>>>.................
-export const regenerateReplyService = async ({ mid, uid }) => {
+export const regenerateReplyService = async ({ mid, uid, requestedModel }) => {
   if (!mid) {
     throw new ErrorHandler("Message ID is required.", 400);
   }
@@ -396,9 +456,34 @@ export const regenerateReplyService = async ({ mid, uid }) => {
     throw new ErrorHandler("Previous user message content is empty.", 400);
   }
 
+  const selectedRequestedModel =
+    requestedModel ||
+    assistantMessage.selectedModel ||
+    previousUserMessage.selectedModel ||
+    "basic";
+
+  const estimatedInputTokens = estimateTokens(previousUserMessage.content);
+
+  const planCheck = await checkPlanLimit({
+    userId: uid,
+    action: PLAN_ACTIONS.SEND_MESSAGE,
+    requestedModel: selectedRequestedModel,
+    estimatedTokens: estimatedInputTokens,
+  });
+
+  const { selectedModel, modelConfig } = resolveModelForUser({
+    requestedModel: selectedRequestedModel,
+    limits: planCheck.limits,
+  });
+
   assistantMessage.status = "pending";
   assistantMessage.content = "";
-  assistantMessage.errorMessage = undefined;
+  assistantMessage.errorMessage = null;
+  assistantMessage.selectedModel = selectedModel;
+  assistantMessage.provider = modelConfig.provider;
+  assistantMessage.model = modelConfig.model;
+  assistantMessage.tokensUsed = 0;
+
   await assistantMessage.save();
 
   const recentMessages = await messageModel
@@ -425,6 +510,8 @@ export const regenerateReplyService = async ({ mid, uid }) => {
     const aiResult = await generateAIResponse({
       prompt: previousUserMessage.content.trim(),
       history,
+      provider: modelConfig.provider,
+      model: modelConfig.model,
     });
 
     if (!aiResult?.response) {
@@ -433,14 +520,22 @@ export const regenerateReplyService = async ({ mid, uid }) => {
 
     assistantMessage.content = aiResult.response;
     assistantMessage.status = "completed";
-    assistantMessage.model = aiResult.model;
+    assistantMessage.selectedModel = selectedModel;
+    assistantMessage.provider = aiResult.provider || modelConfig.provider;
+    assistantMessage.model = aiResult.model || modelConfig.model;
     assistantMessage.tokensUsed = aiResult.tokensUsed || 0;
-    assistantMessage.errorMessage = undefined;
+    assistantMessage.errorMessage = null;
 
     await assistantMessage.save();
 
     conversation.lastMessageAt = new Date();
     await conversation.save();
+
+    await incrementUsage({
+      userId: uid,
+      messages: 1,
+      tokens: aiResult.tokensUsed || estimatedInputTokens,
+    });
 
     return assistantMessage;
   } catch (error) {
@@ -449,6 +544,9 @@ export const regenerateReplyService = async ({ mid, uid }) => {
     assistantMessage.status = "failed";
     assistantMessage.errorMessage =
       error.message || "AI response generation failed.";
+    assistantMessage.selectedModel = selectedModel;
+    assistantMessage.provider = modelConfig.provider;
+    assistantMessage.model = modelConfig.model;
 
     await assistantMessage.save();
 
@@ -499,7 +597,11 @@ export const searchMessageService = async (searchData = {}) => {
 };
 
 // ! Retry Failed Messages Service ----------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>
-export const retryFailedMessageService = async ({ mid, uid }) => {
+export const retryFailedMessageService = async ({
+  mid,
+  uid,
+  requestedModel,
+}) => {
   if (!uid) {
     throw new ErrorHandler("User ID is required.", 400);
   }
@@ -555,6 +657,26 @@ export const retryFailedMessageService = async ({ mid, uid }) => {
     throw new ErrorHandler("Previous user message content is empty.", 400);
   }
 
+  const selectedRequestedModel =
+    requestedModel ||
+    message.selectedModel ||
+    previousUserMessage.selectedModel ||
+    "basic";
+
+  const estimatedInputTokens = estimateTokens(previousUserMessage.content);
+
+  const planCheck = await checkPlanLimit({
+    userId: uid,
+    action: PLAN_ACTIONS.SEND_MESSAGE,
+    requestedModel: selectedRequestedModel,
+    estimatedTokens: estimatedInputTokens,
+  });
+
+  const { selectedModel, modelConfig } = resolveModelForUser({
+    requestedModel: selectedRequestedModel,
+    limits: planCheck.limits,
+  });
+
   const recentMessages = await messageModel
     .find({
       conversation: message.conversation,
@@ -577,13 +699,20 @@ export const retryFailedMessageService = async ({ mid, uid }) => {
 
   message.status = "pending";
   message.content = "";
-  message.errorMessage = undefined;
+  message.errorMessage = null;
+  message.selectedModel = selectedModel;
+  message.provider = modelConfig.provider;
+  message.model = modelConfig.model;
+  message.tokensUsed = 0;
+
   await message.save();
 
   try {
     const aiResult = await generateAIResponse({
       prompt: previousUserMessage.content.trim(),
       history,
+      provider: modelConfig.provider,
+      model: modelConfig.model,
     });
 
     if (!aiResult?.response) {
@@ -592,14 +721,21 @@ export const retryFailedMessageService = async ({ mid, uid }) => {
 
     message.content = aiResult.response;
     message.status = "completed";
-    message.model = aiResult.model;
+    message.selectedModel = selectedModel;
+    message.provider = aiResult.provider || modelConfig.provider;
+    message.model = aiResult.model || modelConfig.model;
     message.tokensUsed = aiResult.tokensUsed || 0;
-    message.errorMessage = undefined;
+    message.errorMessage = null;
 
     await message.save();
 
     conversation.lastMessageAt = new Date();
     await conversation.save();
+
+    await incrementUsage({
+      userId: uid,
+      tokens: aiResult.tokensUsed || estimatedInputTokens,
+    });
 
     return message;
   } catch (error) {
@@ -607,6 +743,9 @@ export const retryFailedMessageService = async ({ mid, uid }) => {
       "Sorry, I couldn't generate a response. Please try again.";
     message.status = "failed";
     message.errorMessage = error.message || "AI response generation failed.";
+    message.selectedModel = selectedModel;
+    message.provider = modelConfig.provider;
+    message.model = modelConfig.model;
 
     await message.save();
 
@@ -619,7 +758,6 @@ export const retryFailedMessageService = async ({ mid, uid }) => {
     );
   }
 };
-
 // ! Cancel Assistent Message Generation --------------------->>>>>>>>>>>>>>>>>>>>>>
 export const cancelMessageGenerationService = async ({ uid, amid }) => {
   if (!uid) {
@@ -674,6 +812,7 @@ export const streamMessageService = async ({
   userId,
   conversationId,
   content,
+  requestedModel = "basic",
   sendEvent,
 }) => {
   if (!userId) {
@@ -688,6 +827,21 @@ export const streamMessageService = async ({
     throw new ErrorHandler("Message content is required.", 400);
   }
 
+  const estimatedInputTokens = estimateTokens(content);
+
+  // ✅ Plan + model + monthly usage check
+  const planCheck = await checkPlanLimit({
+    userId,
+    action: PLAN_ACTIONS.SEND_MESSAGE,
+    requestedModel,
+    estimatedTokens: estimatedInputTokens,
+  });
+
+  const { selectedModel, modelConfig } = resolveModelForUser({
+    requestedModel,
+    limits: planCheck.limits,
+  });
+
   const user = await userModel.findById(userId);
 
   if (!user) {
@@ -699,25 +853,6 @@ export const streamMessageService = async ({
       dailyMessages: 0,
       lastResetDate: new Date(),
     };
-  }
-
-  const today = new Date().toDateString();
-  const lastResetDate = new Date(user.usage.lastResetDate).toDateString();
-
-  if (today !== lastResetDate) {
-    user.usage.dailyMessages = 0;
-    user.usage.lastResetDate = new Date();
-    await user.save({ validateBeforeSave: false });
-  }
-
-  const userPlan = user.plan || "free";
-  const dailyLimit = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
-
-  if (user.usage.dailyMessages >= dailyLimit) {
-    throw new ErrorHandler(
-      `Daily message limit reached. Your ${userPlan} plan allows ${dailyLimit} messages per day.`,
-      429,
-    );
   }
 
   const conversation = await Conversation.findOne({
@@ -735,6 +870,7 @@ export const streamMessageService = async ({
     role: "user",
     content: content.trim(),
     status: "completed",
+    selectedModel,
   });
 
   const assistantMessage = await messageModel.create({
@@ -743,9 +879,14 @@ export const streamMessageService = async ({
     role: "assistant",
     content: "",
     status: "pending",
+    selectedModel,
+    provider: modelConfig.provider,
+    model: modelConfig.model,
+    tokensUsed: 0,
   });
 
   user.usage.dailyMessages += 1;
+  user.usage.lastResetDate = user.usage.lastResetDate || new Date();
   await user.save({ validateBeforeSave: false });
 
   sendEvent("start", {
@@ -761,7 +902,7 @@ export const streamMessageService = async ({
         conversation: conversationId,
         user: userId,
         status: "completed",
-        createdAt: { $lt: assistantMessage.createdAt },
+        createdAt: { $lt: userMessage.createdAt },
       })
       .sort({ createdAt: -1 })
       .limit(20)
@@ -776,9 +917,10 @@ export const streamMessageService = async ({
         content: msg.content,
       }));
 
-    const { stream, model } = await generateOpenRouterStream({
+    const { stream, model, provider } = await generateOpenRouterStream({
       prompt: content.trim(),
       history,
+      model: modelConfig.model,
     });
 
     for await (const chunkText of readOpenRouterStream(stream)) {
@@ -792,11 +934,22 @@ export const streamMessageService = async ({
       });
     }
 
+    if (!fullResponse.trim()) {
+      throw new ErrorHandler("Empty AI stream response received.", 500);
+    }
+
     const latestAssistantMessage = await messageModel.findById(
       assistantMessage._id,
     );
 
-    if (latestAssistantMessage.status === "cancelled") {
+    if (latestAssistantMessage?.status === "cancelled") {
+      sendEvent("done", {
+        userMessageId: userMessage._id,
+        assistantMessageId: latestAssistantMessage._id,
+        status: "cancelled",
+        fullResponse: latestAssistantMessage.content || fullResponse,
+      });
+
       return {
         userMessage,
         assistantMessage: latestAssistantMessage,
@@ -805,14 +958,22 @@ export const streamMessageService = async ({
 
     assistantMessage.content = fullResponse;
     assistantMessage.status = "completed";
-    assistantMessage.model = model;
-    assistantMessage.tokensUsed = 0;
-    assistantMessage.errorMessage = undefined;
+    assistantMessage.selectedModel = selectedModel;
+    assistantMessage.provider = provider || modelConfig.provider;
+    assistantMessage.model = model || modelConfig.model;
+    assistantMessage.tokensUsed = estimatedInputTokens;
+    assistantMessage.errorMessage = null;
 
     await assistantMessage.save();
 
     conversation.lastMessageAt = new Date();
     await conversation.save();
+
+    await incrementUsage({
+      userId,
+      messages: 1,
+      tokens: estimatedInputTokens,
+    });
 
     sendEvent("done", {
       userMessageId: userMessage._id,
@@ -831,6 +992,9 @@ export const streamMessageService = async ({
     assistantMessage.status = "failed";
     assistantMessage.errorMessage =
       error.message || "AI streaming generation failed.";
+    assistantMessage.selectedModel = selectedModel;
+    assistantMessage.provider = modelConfig.provider;
+    assistantMessage.model = modelConfig.model;
 
     await assistantMessage.save();
 

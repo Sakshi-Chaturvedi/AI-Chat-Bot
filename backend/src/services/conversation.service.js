@@ -6,6 +6,7 @@ import messageModel from "../models/message.model.js";
 import crypto from "crypto";
 import { PLAN_ACTIONS } from "../constants/planActions.js";
 import { checkPlanLimit } from "./plan.service.js";
+import { incrementUsage } from "./usage.service.js";
 
 // ! Create Conversation Service -------------------->>>>>>>>>>>>>>>>>>>>>>>>>>..............................
 export const createConversationService = async (userData = {}) => {
@@ -18,9 +19,21 @@ export const createConversationService = async (userData = {}) => {
     throw new ErrorHandler("User not found.", 404);
   }
 
+  // ✅ Check plan conversation limit
+  await checkPlanLimit({
+    userId,
+    action: PLAN_ACTIONS.CREATE_CONVERSATION,
+  });
+
   const conversation = await Conversation.create({
     user: userId,
     title,
+  });
+
+  // ✅ Increment monthly conversation usage
+  await incrementUsage({
+    userId,
+    conversations: 1,
   });
 
   return conversation;
@@ -221,7 +234,6 @@ export const archiveConversationService = async (conversationData = {}) => {
 };
 
 // ! Search Conversation Service --------------------->>>>>>>>>>>>>>>>>>>>>....................
-// ! Search Conversations By Title Service
 export const searchConversationService = async (searchData = {}) => {
   const uid = searchData.uid;
   const searchQuery = searchData.searchQuery?.trim();
@@ -257,23 +269,25 @@ export const exportConversationService = async ({
   format = "json",
 }) => {
   if (!uid) {
-    throw new ErrorHandler("User Id is Required.", 400);
+    throw new ErrorHandler("User ID is required.", 400);
   }
 
   if (!cid) {
     throw new ErrorHandler(
-      "Conversation id is required for exporting Conversation.",
+      "Conversation ID is required for exporting conversation.",
       400,
     );
   }
 
   if (!mongoose.Types.ObjectId.isValid(cid)) {
-    throw new ErrorHandler("Invalid Conversation Id.", 400);
+    throw new ErrorHandler("Invalid conversation ID.", 400);
   }
+
+  const normalizedFormat = String(format).toLowerCase().trim();
 
   const allowedFormats = ["json", "markdown"];
 
-  if (!allowedFormats.includes(format)) {
+  if (!allowedFormats.includes(normalizedFormat)) {
     throw new ErrorHandler(
       "Invalid export format. Allowed formats are: json, markdown.",
       400,
@@ -291,30 +305,36 @@ export const exportConversationService = async ({
   }).lean();
 
   if (!conversation) {
-    throw new ErrorHandler("Conversation Not found.", 404);
+    throw new ErrorHandler("Conversation not found or unauthorized.", 404);
   }
 
   const messages = await messageModel
     .find({
       conversation: cid,
       user: uid,
-      $or: [{ status: { $ne: "pending" } }, { content: { $ne: "" } }],
+      status: { $in: ["completed", "failed", "cancelled"] },
+      content: { $ne: "" },
     })
-    .select("-__v")
+    .select(
+      "role content status selectedModel provider model tokensUsed errorMessage createdAt updatedAt",
+    )
     .sort({ createdAt: 1 })
     .lean();
 
-  // Usage increment should happen for both JSON and Markdown export
-  await incrementUsage({
-    userId: uid,
-    exports: 1,
-  });
+  const safeTitle =
+    (conversation.title || "conversation")
+      .replace(/[^a-z0-9]/gi, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .toLowerCase()
+      .slice(0, 50) || "conversation";
 
-  // ! JSON Export
-  if (format === "json") {
-    return {
+  let exportedData;
+
+  if (normalizedFormat === "json") {
+    exportedData = {
       format: "json",
-      fileName: `conversation-${cid}.json`,
+      fileName: `${safeTitle}-${cid}.json`,
       contentType: "application/json",
       data: {
         conversation: {
@@ -328,10 +348,11 @@ export const exportConversationService = async ({
           role: msg.role,
           content: msg.content,
           status: msg.status,
+          selectedModel: msg.selectedModel,
           provider: msg.provider,
           model: msg.model,
-          tokensUsed: msg.tokensUsed,
-          errorMessage: msg.errorMessage,
+          tokensUsed: msg.tokensUsed || 0,
+          errorMessage: msg.errorMessage || null,
           createdAt: msg.createdAt,
           updatedAt: msg.updatedAt,
         })),
@@ -339,8 +360,7 @@ export const exportConversationService = async ({
     };
   }
 
-  // ! Markdown Export
-  if (format === "markdown") {
+  if (normalizedFormat === "markdown") {
     const markdownContent = `
 # ${conversation.title || "Untitled Conversation"}
 
@@ -359,32 +379,41 @@ ${messages
           ? "Assistant"
           : msg.role || "Unknown";
 
+    const meta = [
+      `**Status:** ${msg.status}`,
+      msg.selectedModel ? `**Selected Model:** ${msg.selectedModel}` : null,
+      msg.provider ? `**Provider:** ${msg.provider}` : null,
+      msg.model ? `**Model:** ${msg.model}` : null,
+      `**Created At:** ${msg.createdAt}`,
+    ]
+      .filter(Boolean)
+      .join("  \n");
+
     return `## ${role}
 
 ${msg.content || ""}
 
-**Created At:** ${msg.createdAt}
+${meta}
 
 ---`;
   })
   .join("\n\n")}
 `;
 
-    const safeTitle =
-      (conversation.title || "conversation")
-        .replace(/[^a-z0-9]/gi, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "")
-        .toLowerCase()
-        .slice(0, 50) || "conversation";
-
-    return {
+    exportedData = {
       format: "markdown",
       fileName: `${safeTitle}-${cid}.md`,
       contentType: "text/markdown",
       content: markdownContent.trim(),
     };
   }
+
+  await incrementUsage({
+    userId: uid,
+    exports: 1,
+  });
+
+  return exportedData;
 };
 
 // ! Share Conversation Service ------------------->>>>>>>>>>>>>>>>>>>>>>>>>
@@ -415,27 +444,39 @@ export const shareConversationService = async ({ uid, cid }) => {
     throw new ErrorHandler("Conversation not found or unauthorized.", 404);
   }
 
-  if (conversation.isShared && conversation.shareId) {
+  const frontendURL =
+    process.env.FRONTEND_URL && process.env.FRONTEND_URL !== "undefined"
+      ? process.env.FRONTEND_URL
+      : "http://localhost:5173";
+
+  const isShareExpired =
+    conversation.shareExpiresAt && conversation.shareExpiresAt < new Date();
+
+  if (conversation.isShared && conversation.shareId && !isShareExpired) {
     return {
       shareId: conversation.shareId,
+      shareUrl: `${frontendURL}/share/${conversation.shareId}`,
       isShared: true,
       sharedAt: conversation.sharedAt,
+      shareExpiresAt: conversation.shareExpiresAt,
     };
   }
 
   const shareId = crypto.randomBytes(24).toString("hex");
-  conversation.shareExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   conversation.isShared = true;
   conversation.shareId = shareId;
   conversation.sharedAt = new Date();
+  conversation.shareExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   await conversation.save();
 
   return {
     shareId: conversation.shareId,
+    shareUrl: `${frontendURL}/share/${conversation.shareId}`,
     isShared: conversation.isShared,
     sharedAt: conversation.sharedAt,
+    shareExpiresAt: conversation.shareExpiresAt,
   };
 };
 
