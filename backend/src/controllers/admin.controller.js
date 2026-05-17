@@ -1,5 +1,9 @@
 import catchAsyncError from "../middlewares/catchAsyncError.js";
-import { resetUserUsageService, updateUserPlanService } from "../services/admin.service.js";
+import {
+  getAdminDashboardStatsService,
+  resetUserUsageService,
+  updateUserPlanService,
+} from "../services/admin.service.js";
 
 // ! Reset User Usage Controller --------------------------->>>>>>>>>>>>>>>>>>>>>>........................
 export const resetUserUsageController = catchAsyncError(
@@ -35,6 +39,19 @@ export const updateUserPlanController = catchAsyncError(
       success: true,
       message: "User plan updated successfully.",
       user,
+    });
+  },
+);
+
+// ! Admin Dashboard Stats Controller ------------------------->>>>>>>>>>>>>>>>>>>>>........................
+export const getAdminDashboardController = catchAsyncError(
+  async (req, res, next) => {
+    const stats = await getAdminDashboardStatsService();
+
+    res.status(200).json({
+      success: true,
+      message: "Admin dashboard stats fetched successfully.",
+      stats,
     });
   },
 );
