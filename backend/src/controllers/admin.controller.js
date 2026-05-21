@@ -2,6 +2,7 @@ import catchAsyncError from "../middlewares/catchAsyncError.js";
 import {
   getAdminDashboardStatsService,
   getAllUsersService,
+  getExpiringSubscriptionsService,
   getFailedMessageStatsService,
   getSingleUserDetailsService,
   recentUserService,
@@ -158,7 +159,7 @@ export const updateUserStatusController = catchAsyncError(
   },
 );
 
-// ! Admin Recent Users Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>
+// ! Admin Recent Users Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>...............................
 export const recentUserController = catchAsyncError(async (req, res, next) => {
   const { limit } = req.query;
 
@@ -170,3 +171,19 @@ export const recentUserController = catchAsyncError(async (req, res, next) => {
     ...result,
   });
 });
+
+
+// ! Expiring Subscriptions Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>
+export const getExpiringSubscriptionsController = catchAsyncError(
+  async (req, res, next) => {
+    const { days } = req.query;
+
+    const result = await getExpiringSubscriptionsService({ days });
+
+    res.status(200).json({
+      success: true,
+      message: "Expiring subscriptions fetched successfully.",
+      ...result,
+    });
+  },
+);

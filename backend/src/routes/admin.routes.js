@@ -2,6 +2,7 @@ import express from "express";
 import {
   getAdminDashboardController,
   getAllUsersController,
+  getExpiringSubscriptionsController,
   getFailedMessageStatsController,
   getSingleUserDetailsController,
   recentUserController,
@@ -33,6 +34,13 @@ router.get(
   authMiddleWare,
   authorizeRoles("admin"),
   recentUserController,
+);
+
+router.get(
+  "/subscriptions/expiring",
+  authMiddleWare,
+  authorizeRoles("admin"),
+  getExpiringSubscriptionsController,
 );
 
 router.get(

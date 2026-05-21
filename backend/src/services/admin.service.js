@@ -821,3 +821,70 @@ export const recentUserService = async ({ limit = 5 }) => {
     },
   };
 };
+
+// ! Expiring Subscriptions Service ---------------------->>>>>>>>>>>>>>>>>>>>>>>>>
+export const getExpiringSubscriptionsService = async ({ days }) => {
+  const selectedDays = days === undefined ? 7 : Number(days);
+
+  if (Number.isNaN(selectedDays)) {
+    throw new ErrorHandler("Invalid days value.", 400);
+  }
+
+  if (selectedDays <= 0) {
+    throw new ErrorHandler("Days must be greater than 0.", 400);
+  }
+
+  if (selectedDays > 365) {
+    throw new ErrorHandler("Days cannot be greater than 365.", 400);
+  }
+
+  const now = new Date();
+
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + selectedDays);
+
+  const users = await userModel
+    .find({
+      subscriptionStatus: "active",
+      plan: { $in: ["pro", "premium"] },
+      subscriptionExpiresAt: {
+        $exists: true,
+        $ne: null,
+        $gte: now,
+        $lte: endDate,
+      },
+    })
+    .select(
+      "_id name email role plan subscriptionStatus subscriptionStartedAt subscriptionExpiresAt accountStatus createdAt",
+    )
+    .sort({ subscriptionExpiresAt: 1 })
+    .lean();
+
+  const oneDayInMs = 24 * 60 * 60 * 1000;
+
+  const subscriptions = users.map((user) => ({
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    plan: user.plan,
+    subscriptionStatus: user.subscriptionStatus,
+    accountStatus: user.accountStatus,
+    subscriptionStartedAt: user.subscriptionStartedAt,
+    subscriptionExpiresAt: user.subscriptionExpiresAt,
+    daysLeft: Math.ceil(
+      (new Date(user.subscriptionExpiresAt) - now) / oneDayInMs,
+    ),
+    createdAt: user.createdAt,
+  }));
+
+  return {
+    subscriptions,
+    meta: {
+      days: selectedDays,
+      from: now,
+      to: endDate,
+      totalReturned: subscriptions.length,
+    },
+  };
+};
