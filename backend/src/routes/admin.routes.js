@@ -5,6 +5,7 @@ import {
   getFailedMessageStatsController,
   getSingleUserDetailsController,
   resetUserUsageController,
+  topUsersController,
   updateUserPlanController,
 } from "../controllers/admin.controller.js";
 import authMiddleWare from "../middlewares/auth.middleware.js";
@@ -37,6 +38,13 @@ router.get(
   authMiddleWare,
   authorizeRoles("admin"),
   getFailedMessageStatsController,
+);
+
+router.get(
+  "/usage/top-users",
+  authMiddleWare,
+  authorizeRoles("admin"),
+  topUsersController,
 );
 
 router.patch(

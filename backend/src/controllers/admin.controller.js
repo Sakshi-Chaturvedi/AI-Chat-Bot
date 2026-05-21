@@ -5,6 +5,7 @@ import {
   getFailedMessageStatsService,
   getSingleUserDetailsService,
   resetUserUsageService,
+  topUsersService,
   updateUserPlanService,
 } from "../services/admin.service.js";
 
@@ -115,3 +116,20 @@ export const getFailedMessageStatsController = catchAsyncError(
     });
   },
 );
+
+// ! Top Users Controller ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const topUsersController = catchAsyncError(async (req, res, next) => {
+  const { month, limit, sortBy } = req.query;
+
+  const result = await topUsersService({
+    month,
+    limit,
+    sortBy,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Top users by usage fetched successfully.",
+    ...result,
+  });
+});

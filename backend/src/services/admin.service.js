@@ -643,3 +643,79 @@ export const getFailedMessageStatsService = async ({
     },
   };
 };
+
+// ! Top Users Service ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const topUsersService = async ({
+  month,
+  limit = 10,
+  sortBy = "messagesUsed",
+}) => {
+  const selectedMonth = month || getCurrentUsageMonth();
+
+  const perPage = Number(limit) || 10;
+
+  if (perPage < 1) {
+    throw new ErrorHandler("Limit must be greater than 0.", 400);
+  }
+
+  if (perPage > 100) {
+    throw new ErrorHandler("Limit cannot be greater than 100.", 400);
+  }
+
+  const monthRegex = /^\d{4}-\d{2}$/;
+
+  if (!monthRegex.test(selectedMonth)) {
+    throw new ErrorHandler("Invalid month format. Use YYYY-MM.", 400);
+  }
+
+  const allowedSortFields = [
+    "messagesUsed",
+    "tokensUsed",
+    "conversationsCreated",
+    "exportsUsed",
+  ];
+
+  if (!allowedSortFields.includes(sortBy)) {
+    throw new ErrorHandler("Invalid sort field.", 400);
+  }
+
+  const topUsageRecords = await Usage.find({
+    month: selectedMonth,
+  })
+    .sort({ [sortBy]: -1 })
+    .limit(perPage)
+    .populate("user", "name email role plan subscriptionStatus")
+    .lean();
+
+  const topUsers = topUsageRecords.map((record, index) => ({
+    rank: index + 1,
+    user: record.user
+      ? {
+          id: record.user._id,
+          name: record.user.name,
+          email: record.user.email,
+          role: record.user.role,
+          plan: record.user.plan,
+          subscriptionStatus: record.user.subscriptionStatus,
+        }
+      : null,
+    usage: {
+      month: record.month,
+      messagesUsed: record.messagesUsed,
+      tokensUsed: record.tokensUsed,
+      conversationsCreated: record.conversationsCreated,
+      exportsUsed: record.exportsUsed,
+      lastUsedAt: record.lastUsedAt,
+    },
+  }));
+
+  return {
+    topUsers,
+    meta: {
+      month: selectedMonth,
+      sortBy,
+      limit: perPage,
+      totalReturned: topUsers.length,
+    },
+  };
+};
