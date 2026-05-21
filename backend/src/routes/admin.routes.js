@@ -4,6 +4,7 @@ import {
   getAllUsersController,
   getFailedMessageStatsController,
   getSingleUserDetailsController,
+  recentUserController,
   resetUserUsageController,
   topUsersController,
   updateUserPlanController,
@@ -25,6 +26,13 @@ router.get(
   authMiddleWare,
   authorizeRoles("admin"),
   getAllUsersController,
+);
+
+router.get(
+  "/users/recent",
+  authMiddleWare,
+  authorizeRoles("admin"),
+  recentUserController,
 );
 
 router.get(

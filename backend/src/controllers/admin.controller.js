@@ -4,6 +4,7 @@ import {
   getAllUsersService,
   getFailedMessageStatsService,
   getSingleUserDetailsService,
+  recentUserService,
   resetUserUsageService,
   topUsersService,
   updateUserPlanService,
@@ -156,3 +157,16 @@ export const updateUserStatusController = catchAsyncError(
     });
   },
 );
+
+// ! Admin Recent Users Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>
+export const recentUserController = catchAsyncError(async (req, res, next) => {
+  const { limit } = req.query;
+
+  const result = await recentUserService({ limit });
+
+  res.status(200).json({
+    success: true,
+    message: "Recent users fetched successfully.",
+    ...result,
+  });
+});

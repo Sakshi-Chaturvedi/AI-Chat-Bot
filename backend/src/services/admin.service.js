@@ -780,3 +780,44 @@ export const updateUserStatusService = async ({
     updatedAt: user.updatedAt,
   };
 };
+
+// ! Admin Recent Users Service ---------------------->>>>>>>>>>>>>>>>>>>>>>>>
+export const recentUserService = async ({ limit = 5 }) => {
+  const limits = Number(limit) || 5;
+
+  if (limits < 1) {
+    throw new ErrorHandler("Limit must be greater than 0.", 400);
+  }
+
+  if (limits > 50) {
+    throw new ErrorHandler("Limit cannot be greater than 50.", 400);
+  }
+
+  const users = await userModel
+    .find()
+    .select(
+      "_id name email role plan subscriptionStatus accountStatus createdAt",
+    )
+    .sort({ createdAt: -1 })
+    .limit(limits)
+    .lean();
+
+  const recentUsers = users.map((user) => ({
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    plan: user.plan,
+    subscriptionStatus: user.subscriptionStatus,
+    accountStatus: user.accountStatus,
+    createdAt: user.createdAt,
+  }));
+
+  return {
+    recentUsers,
+    meta: {
+      limit: limits,
+      totalReturned: recentUsers.length,
+    },
+  };
+};
