@@ -1,4 +1,4 @@
-import { PLAN_LIMITS } from "../constants/limits.js";
+import { PLAN_LIMITS, SUBSCRIPTION_STATUS, USER_PLANS } from "../constants/limits.js";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
 import Usage from "../models/usage.model.js";
 import userModel from "../models/user.model.js";
@@ -291,5 +291,106 @@ export const getAdminDashboardStatsService = async () => {
 
     recentUsers,
     topUsersByUsage,
+  };
+};
+
+// ! Get All Users Service ----------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const getAllUsersService = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+  plan,
+  subscriptionStatus,
+  role,
+}) => {
+  const currentPage = Number(page) || 1;
+  const perPage = Number(limit) || 10;
+
+  if (currentPage < 1) {
+    throw new ErrorHandler("Page must be greater than 0.", 400);
+  }
+
+  if (perPage < 1) {
+    throw new ErrorHandler("Limit must be greater than 0.", 400);
+  }
+
+  if (perPage > 100) {
+    throw new ErrorHandler("Limit cannot be greater than 100.", 400);
+  }
+
+  const filter = {};
+
+  // plan filter
+  if (plan) {
+    const validPlans = Object.values(USER_PLANS);
+
+    if (!validPlans.includes(plan)) {
+      throw new ErrorHandler("Invalid plan filter.", 400);
+    }
+
+    filter.plan = plan;
+  }
+
+  // subscriptionStatus filter
+  if (subscriptionStatus) {
+    const validSubscriptionStatuses = Object.values(SUBSCRIPTION_STATUS);
+
+    if (!validSubscriptionStatuses.includes(subscriptionStatus)) {
+      throw new ErrorHandler("Invalid subscription status filter.", 400);
+    }
+
+    filter.subscriptionStatus = subscriptionStatus;
+  }
+
+  // role filter
+  if (role) {
+    const validRoles = ["user", "admin"];
+
+    if (!validRoles.includes(role)) {
+      throw new ErrorHandler("Invalid role filter.", 400);
+    }
+
+    filter.role = role;
+  }
+
+  // search filter by name/email
+  if (search && search.trim()) {
+    const searchRegex = new RegExp(search.trim(), "i");
+
+    filter.$or = [{ name: searchRegex }, { email: searchRegex }];
+  }
+
+  const skip = (currentPage - 1) * perPage;
+
+  const users = await userModel
+    .find(filter)
+    .select(
+      "_id name email role plan subscriptionStatus subscriptionStartedAt subscriptionExpiresAt createdAt updatedAt",
+    )
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(perPage)
+    .lean();
+
+  const totalUsers = await userModel.countDocuments(filter);
+
+  const totalPages = Math.ceil(totalUsers / perPage) || 1;
+
+  return {
+    users,
+    pagination: {
+      currentPage,
+      limit: perPage,
+      totalUsers,
+      totalPages,
+      hasNextPage: currentPage < totalPages,
+      hasPrevPage: currentPage > 1,
+    },
+    filters: {
+      search: search || null,
+      plan: plan || null,
+      subscriptionStatus: subscriptionStatus || null,
+      role: role || null,
+    },
   };
 };
