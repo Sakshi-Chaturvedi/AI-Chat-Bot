@@ -1,10 +1,15 @@
-import { PLAN_LIMITS, SUBSCRIPTION_STATUS, USER_PLANS } from "../constants/limits.js";
+import {
+  PLAN_LIMITS,
+  SUBSCRIPTION_STATUS,
+  USER_PLANS,
+} from "../constants/limits.js";
 import { ErrorHandler } from "../middlewares/error.middleware.js";
 import Usage from "../models/usage.model.js";
 import userModel from "../models/user.model.js";
 import { getCurrentUsageMonth } from "../utils/usageMonth.js";
 import Conversation from "../models/conversation.model.js";
 import messageModel from "../models/message.model.js";
+import mongoose from "mongoose";
 // import Usage from "../models/usage.model.js";
 
 // ! Reset User Usage Service --------------------->>>>>>>>>>>>>>>>>>>>>>>>>
@@ -392,5 +397,109 @@ export const getAllUsersService = async ({
       subscriptionStatus: subscriptionStatus || null,
       role: role || null,
     },
+  };
+};
+
+// ! Get Single User Service ------------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+export const getSingleUserDetailsService = async ({ uid }) => {
+  if (!uid) {
+    throw new ErrorHandler("User id is required for fetching details.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(uid)) {
+    throw new ErrorHandler("Invalid User ID.", 400);
+  }
+
+  const user = await userModel
+    .findById(uid)
+    .select(
+      "_id name email role plan subscriptionStatus subscriptionStartedAt subscriptionExpiresAt createdAt updatedAt",
+    )
+    .lean();
+
+  if (!user) {
+    throw new ErrorHandler("User not found.", 404);
+  }
+
+  const [
+    totalConversations,
+    sharedConversations,
+    archivedConversations,
+    pinnedConversations,
+    totalMessages,
+    userMessages,
+    assistantMessages,
+    completedMessages,
+    failedMessages,
+    pendingMessages,
+    usage,
+  ] = await Promise.all([
+    Conversation.countDocuments({ user: uid }),
+    Conversation.countDocuments({ user: uid, isShared: true }),
+    Conversation.countDocuments({ user: uid, isArchived: true }),
+    Conversation.countDocuments({ user: uid, isPinned: true }),
+
+    messageModel.countDocuments({ user: uid }),
+    messageModel.countDocuments({ user: uid, role: "user" }),
+    messageModel.countDocuments({ user: uid, role: "assistant" }),
+    messageModel.countDocuments({ user: uid, status: "completed" }),
+    messageModel.countDocuments({ user: uid, status: "failed" }),
+    messageModel.countDocuments({ user: uid, status: "pending" }),
+
+    Usage.findOne({
+      user: uid,
+      month: getCurrentUsageMonth(),
+    }).lean(),
+  ]);
+
+  return {
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      plan: user.plan,
+      subscriptionStatus: user.subscriptionStatus,
+      subscriptionStartedAt: user.subscriptionStartedAt,
+      subscriptionExpiresAt: user.subscriptionExpiresAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
+
+    stats: {
+      conversations: {
+        total: totalConversations,
+        shared: sharedConversations,
+        archived: archivedConversations,
+        pinned: pinnedConversations,
+      },
+
+      messages: {
+        total: totalMessages,
+        user: userMessages,
+        assistant: assistantMessages,
+        completed: completedMessages,
+        failed: failedMessages,
+        pending: pendingMessages,
+      },
+    },
+
+    usage: usage
+      ? {
+          month: usage.month,
+          messagesUsed: usage.messagesUsed,
+          tokensUsed: usage.tokensUsed,
+          conversationsCreated: usage.conversationsCreated,
+          exportsUsed: usage.exportsUsed,
+          lastUsedAt: usage.lastUsedAt,
+        }
+      : {
+          month: getCurrentUsageMonth(),
+          messagesUsed: 0,
+          tokensUsed: 0,
+          conversationsCreated: 0,
+          exportsUsed: 0,
+          lastUsedAt: null,
+        },
   };
 };

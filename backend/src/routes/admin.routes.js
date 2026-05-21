@@ -2,6 +2,7 @@ import express from "express";
 import {
   getAdminDashboardController,
   getAllUsersController,
+  getSingleUserDetailsController,
   resetUserUsageController,
   updateUserPlanController,
 } from "../controllers/admin.controller.js";
@@ -21,6 +22,13 @@ router.get(
   authMiddleWare,
   authorizeRoles("admin"),
   getAllUsersController,
+);
+
+router.get(
+  "/users/:userId",
+  authMiddleWare,
+  authorizeRoles("admin"),
+  getSingleUserDetailsController,
 );
 
 router.patch(

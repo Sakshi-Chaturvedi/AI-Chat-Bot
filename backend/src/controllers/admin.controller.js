@@ -2,6 +2,7 @@ import catchAsyncError from "../middlewares/catchAsyncError.js";
 import {
   getAdminDashboardStatsService,
   getAllUsersService,
+  getSingleUserDetailsService,
   resetUserUsageService,
   updateUserPlanService,
 } from "../services/admin.service.js";
@@ -76,3 +77,18 @@ export const getAllUsersController = catchAsyncError(async (req, res, next) => {
     ...result,
   });
 });
+
+// ! Get Single User Details Controller -------------------------->>>>>>>>>>>>>>>>>>>........................
+export const getSingleUserDetailsController = catchAsyncError(
+  async (req, res, next) => {
+    const uid = req.params?.userId;
+
+    const userDetails = await getSingleUserDetailsService({ uid });
+
+    res.status(200).json({
+      success: true,
+      message: "User details fetched successfully.",
+      ...userDetails,
+    });
+  },
+);
