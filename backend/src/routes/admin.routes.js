@@ -7,6 +7,7 @@ import {
   resetUserUsageController,
   topUsersController,
   updateUserPlanController,
+  updateUserStatusController,
 } from "../controllers/admin.controller.js";
 import authMiddleWare from "../middlewares/auth.middleware.js";
 import authorizeRoles from "../middlewares/authorizeRoles.middleware.js";
@@ -45,6 +46,13 @@ router.get(
   authMiddleWare,
   authorizeRoles("admin"),
   topUsersController,
+);
+
+router.patch(
+  "/users/:userId/status",
+  authMiddleWare,
+  authorizeRoles("admin"),
+  updateUserStatusController,
 );
 
 router.patch(

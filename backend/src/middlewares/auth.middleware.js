@@ -1,3 +1,4 @@
+import { ACCOUNT_STATUS } from "../constants/limits.js";
 import userModel from "../models/user.model.js";
 import catchAsyncError from "./catchAsyncError.js";
 import { ErrorHandler } from "./error.middleware.js";
@@ -6,26 +7,36 @@ import jwt from "jsonwebtoken";
 const authMiddleWare = catchAsyncError(async (req, res, next) => {
   const token = req.cookies.accessToken;
 
-  // console.log(token);
-  
-
   if (!token) {
-    return next(new ErrorHandler("Please Login First", 401));
+    return next(new ErrorHandler("Please login first.", 401));
   }
 
-  // console.log("Trying to login");
-  
   const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-
-  // console.log(decoded)
 
   const user = await userModel.findById(decoded.id);
 
-  // console.log(user);
-  
-
   if (!user) {
-    return next(new ErrorHandler("User not Found", 404));
+    return next(new ErrorHandler("User not found.", 404));
+  }
+
+  const accountStatus = user.accountStatus || ACCOUNT_STATUS.ACTIVE;
+
+  if (accountStatus === ACCOUNT_STATUS.BLOCKED) {
+    return next(
+      new ErrorHandler(
+        "Your account has been blocked. Please contact support.",
+        403,
+      ),
+    );
+  }
+
+  if (accountStatus === ACCOUNT_STATUS.SUSPENDED) {
+    return next(
+      new ErrorHandler(
+        "Your account has been suspended. Please contact support.",
+        403,
+      ),
+    );
   }
 
   req.user = user;

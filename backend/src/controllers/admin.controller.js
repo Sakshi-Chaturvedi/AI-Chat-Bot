@@ -7,6 +7,7 @@ import {
   resetUserUsageService,
   topUsersService,
   updateUserPlanService,
+  updateUserStatusService,
 } from "../services/admin.service.js";
 
 // ! Reset User Usage Controller --------------------------->>>>>>>>>>>>>>>>>>>>>>........................
@@ -95,7 +96,7 @@ export const getSingleUserDetailsController = catchAsyncError(
   },
 );
 
-// ! Get Failed Message Stats Controller ------------------------->>>>>>>>>>>>>>>>>>>>>
+// ! Get Failed Message Stats Controller ------------------------->>>>>>>>>>>>>>>>>>>>>......................
 export const getFailedMessageStatsController = catchAsyncError(
   async (req, res, next) => {
     const { page, limit, userId, conversationId, fromDate, toDate } = req.query;
@@ -117,7 +118,7 @@ export const getFailedMessageStatsController = catchAsyncError(
   },
 );
 
-// ! Top Users Controller ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+// ! Top Users Controller ------------------->>>>>>>>>>>>>>>>>>>>>>>>>>>>>............................
 export const topUsersController = catchAsyncError(async (req, res, next) => {
   const { month, limit, sortBy } = req.query;
 
@@ -133,3 +134,25 @@ export const topUsersController = catchAsyncError(async (req, res, next) => {
     ...result,
   });
 });
+
+// ! Admin User Status Management Controller ---------------------->>>>>>>>>>>>>>>>>>>>>>>>........................
+export const updateUserStatusController = catchAsyncError(
+  async (req, res, next) => {
+    const userId = req.params?.userId;
+    const { accountStatus, reason } = req.body;
+    const adminId = req.user?.id || req.user?._id;
+
+    const updatedStatus = await updateUserStatusService({
+      userId,
+      accountStatus,
+      reason,
+      adminId,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "User status has been updated successfully.",
+      updatedStatus,
+    });
+  },
+);

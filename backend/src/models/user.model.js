@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { type } from "os";
 
 const userSchema = new mongoose.Schema(
   {
@@ -75,6 +76,22 @@ const userSchema = new mongoose.Schema(
     },
 
     subscriptionExpiresAt: {
+      type: Date,
+    },
+
+    accountStatus: {
+      type: String,
+      enum: ["active", "suspended", "blocked"],
+      default: "active",
+      index: true,
+    },
+
+    statusReason: {
+      type: String,
+      trim: true,
+    },
+
+    statusUpdatedAt: {
       type: Date,
     },
 

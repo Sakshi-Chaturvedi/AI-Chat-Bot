@@ -11,6 +11,12 @@ export const SUBSCRIPTION_STATUS = {
   EXPIRED: "expired",
 };
 
+export const ACCOUNT_STATUS = {
+  ACTIVE: "active",
+  SUSPENDED: "suspended",
+  BLOCKED: "blocked",
+};
+
 export const PLAN_LIMITS = {
   [USER_PLANS.FREE]: {
     monthlyMessages: 20,

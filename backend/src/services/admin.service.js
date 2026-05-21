@@ -1,4 +1,5 @@
 import {
+  ACCOUNT_STATUS,
   PLAN_LIMITS,
   SUBSCRIPTION_STATUS,
   USER_PLANS,
@@ -717,5 +718,65 @@ export const topUsersService = async ({
       limit: perPage,
       totalReturned: topUsers.length,
     },
+  };
+};
+
+// ! Admin User Status Management Service ---------------------->>>>>>>>>>>>>>>>>>>>>>>>
+export const updateUserStatusService = async ({
+  userId,
+  accountStatus,
+  reason,
+  adminId,
+}) => {
+  if (!userId) {
+    throw new ErrorHandler("User Id is required.", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ErrorHandler("Invalid User ID.", 400);
+  }
+
+  if (!accountStatus) {
+    throw new ErrorHandler("Account status is required.", 400);
+  }
+
+  if (!Object.values(ACCOUNT_STATUS).includes(accountStatus)) {
+    throw new ErrorHandler("Invalid account status.", 400);
+  }
+
+  const user = await userModel.findById(userId);
+
+  if (!user) {
+    throw new ErrorHandler("User not found.", 404);
+  }
+
+  if (
+    user._id.toString() === adminId.toString() &&
+    (accountStatus === ACCOUNT_STATUS.SUSPENDED ||
+      accountStatus === ACCOUNT_STATUS.BLOCKED)
+  ) {
+    throw new ErrorHandler(
+      "You cannot block or suspend your own admin account.",
+      400,
+    );
+  }
+
+  user.accountStatus = accountStatus;
+  user.statusReason = reason || "";
+  user.statusUpdatedAt = new Date();
+
+  await user.save({ validateBeforeSave: false });
+
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    plan: user.plan,
+    subscriptionStatus: user.subscriptionStatus,
+    accountStatus: user.accountStatus,
+    statusReason: user.statusReason,
+    statusUpdatedAt: user.statusUpdatedAt,
+    updatedAt: user.updatedAt,
   };
 };
