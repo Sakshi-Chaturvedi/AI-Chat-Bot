@@ -503,3 +503,143 @@ export const getSingleUserDetailsService = async ({ uid }) => {
         },
   };
 };
+
+// ! Get Failed Message Stats Service ------------------------->>>>>>>>>>>>>>>>>>>>>
+export const getFailedMessageStatsService = async ({
+  page = 1,
+  limit = 10,
+  userId,
+  conversationId,
+  fromDate,
+  toDate,
+}) => {
+  const currentPage = Number(page) || 1;
+  const perPage = Number(limit) || 10;
+
+  if (currentPage < 1) {
+    throw new ErrorHandler("Page must be greater than 0.", 400);
+  }
+
+  if (perPage < 1) {
+    throw new ErrorHandler("Limit must be greater than 0.", 400);
+  }
+
+  if (perPage > 100) {
+    throw new ErrorHandler("Limit cannot be greater than 100.", 400);
+  }
+
+  const filter = {
+    status: "failed",
+    role: "assistant",
+  };
+
+  if (userId) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new ErrorHandler("Invalid User ID.", 400);
+    }
+
+    filter.user = userId;
+  }
+
+  if (conversationId) {
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      throw new ErrorHandler("Invalid Conversation ID.", 400);
+    }
+
+    filter.conversation = conversationId;
+  }
+
+  if (fromDate || toDate) {
+    filter.createdAt = {};
+
+    if (fromDate) {
+      const startDate = new Date(fromDate);
+
+      if (Number.isNaN(startDate.getTime())) {
+        throw new ErrorHandler("Invalid fromDate.", 400);
+      }
+
+      filter.createdAt.$gte = startDate;
+    }
+
+    if (toDate) {
+      const endDate = new Date(toDate);
+
+      if (Number.isNaN(endDate.getTime())) {
+        throw new ErrorHandler("Invalid toDate.", 400);
+      }
+
+      endDate.setHours(23, 59, 59, 999);
+
+      filter.createdAt.$lte = endDate;
+    }
+  }
+
+  const skip = (currentPage - 1) * perPage;
+
+  const [failedMessages, totalFailedMessages] = await Promise.all([
+    messageModel
+      .find(filter)
+      .select(
+        "_id user conversation role content status errorMessage model tokensUsed createdAt updatedAt",
+      )
+      .populate("user", "name email plan")
+      .populate("conversation", "title isShared createdAt")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(perPage)
+      .lean(),
+
+    messageModel.countDocuments(filter),
+  ]);
+
+  const totalPages = Math.ceil(totalFailedMessages / perPage) || 1;
+
+  return {
+    failedMessages: failedMessages.map((message) => ({
+      id: message._id,
+      user: message.user
+        ? {
+            id: message.user._id,
+            name: message.user.name,
+            email: message.user.email,
+            plan: message.user.plan,
+          }
+        : null,
+
+      conversation: message.conversation
+        ? {
+            id: message.conversation._id,
+            title: message.conversation.title,
+            isShared: message.conversation.isShared,
+            createdAt: message.conversation.createdAt,
+          }
+        : null,
+
+      role: message.role,
+      content: message.content,
+      status: message.status,
+      errorMessage: message.errorMessage,
+      model: message.model,
+      tokensUsed: message.tokensUsed,
+      createdAt: message.createdAt,
+      updatedAt: message.updatedAt,
+    })),
+
+    pagination: {
+      currentPage,
+      limit: perPage,
+      totalFailedMessages,
+      totalPages,
+      hasNextPage: currentPage < totalPages,
+      hasPrevPage: currentPage > 1,
+    },
+
+    filters: {
+      userId: userId || null,
+      conversationId: conversationId || null,
+      fromDate: fromDate || null,
+      toDate: toDate || null,
+    },
+  };
+};

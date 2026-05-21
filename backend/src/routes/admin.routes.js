@@ -2,6 +2,7 @@ import express from "express";
 import {
   getAdminDashboardController,
   getAllUsersController,
+  getFailedMessageStatsController,
   getSingleUserDetailsController,
   resetUserUsageController,
   updateUserPlanController,
@@ -29,6 +30,13 @@ router.get(
   authMiddleWare,
   authorizeRoles("admin"),
   getSingleUserDetailsController,
+);
+
+router.get(
+  "/messages/failed",
+  authMiddleWare,
+  authorizeRoles("admin"),
+  getFailedMessageStatsController,
 );
 
 router.patch(

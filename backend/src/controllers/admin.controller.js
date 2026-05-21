@@ -2,6 +2,7 @@ import catchAsyncError from "../middlewares/catchAsyncError.js";
 import {
   getAdminDashboardStatsService,
   getAllUsersService,
+  getFailedMessageStatsService,
   getSingleUserDetailsService,
   resetUserUsageService,
   updateUserPlanService,
@@ -89,6 +90,28 @@ export const getSingleUserDetailsController = catchAsyncError(
       success: true,
       message: "User details fetched successfully.",
       ...userDetails,
+    });
+  },
+);
+
+// ! Get Failed Message Stats Controller ------------------------->>>>>>>>>>>>>>>>>>>>>
+export const getFailedMessageStatsController = catchAsyncError(
+  async (req, res, next) => {
+    const { page, limit, userId, conversationId, fromDate, toDate } = req.query;
+
+    const result = await getFailedMessageStatsService({
+      page,
+      limit,
+      userId,
+      conversationId,
+      fromDate,
+      toDate,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Failed messages fetched successfully.",
+      ...result,
     });
   },
 );
